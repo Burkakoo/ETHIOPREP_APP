@@ -62,4 +62,9 @@ const questionSchema = new mongoose.Schema(
   { timestamps: true, collection: "questions" }
 );
 
+questionSchema.index({ subjectId: 1, isActive: 1 });
+questionSchema.index({ chapterId: 1, isActive: 1 });
+questionSchema.index({ subjectId: 1, difficulty: 1, isActive: 1 });
+questionSchema.index({ subjectId: 1, questionType: 1, isActive: 1 });
+
 export const Question = mongoose.model("Question", questionSchema);

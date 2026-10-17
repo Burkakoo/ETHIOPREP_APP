@@ -19,6 +19,7 @@ export const env = {
   port: Number(required("PORT", "5000")),
   mongodbUri: required("MONGODB_URI"),
   clientOrigin: required("CLIENT_ORIGIN", "http://localhost:5173"),
+  clientOrigins: process.env.CLIENT_ORIGINS ? process.env.CLIENT_ORIGINS.split(",").map(o => o.trim()) : [required("CLIENT_ORIGIN", "http://localhost:5173")],
   bcryptSaltRounds: Number(required("BCRYPT_SALT_ROUNDS", "12")),
   jwtSecret: required("JWT_SECRET", "ethioprep-dev-secret")
 };

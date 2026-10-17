@@ -1,60 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { apiRequest, clearSession, saveSession } from "./services/api.js";
+import { roleBadge, statusBadge } from "./components/Badge.jsx";
+import { Spinner } from "./components/Spinner.jsx";
+import { Notice } from "./components/Notice.jsx";
+import { fmtDate, getGreeting } from "./utils/helpers.js";
 import "../../CSS/styles.css";
-
-/* ════════════════════════════════════════════════════════════════
-   HELPERS
-   ════════════════════════════════════════════════════════════════ */
-
-const ROLE_LABELS = {
-  admin: "Administrator",
-  content_manager: "Content Manager",
-  cash_manager: "Cash Manager",
-  student: "Student",
-};
-
-function roleBadge(role) {
-  const cls = `badge role-${role}`;
-  return <span className={cls}>{ROLE_LABELS[role] || role}</span>;
-}
-
-function statusBadge(status) {
-  const map = {
-    active: "badge-green",
-    pending: "badge-amber",
-    published: "badge-green",
-    draft: "badge-gray",
-    archived: "badge-gray",
-    verified: "badge-green",
-    rejected: "badge-red",
-    refunded: "badge-gray",
-    suspended: "badge-red",
-    deleted: "badge-red",
-    in_progress: "badge-blue",
-  };
-  return <span className={`badge ${map[status] || "badge-gray"}`}>{status?.replace(/_/g, " ")}</span>;
-}
-
-function fmtDate(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-ET", { day: "numeric", month: "short", year: "numeric" });
-}
-
-function Notice({ text, type = "info", onClose }) {
-  if (!text) return null;
-  return (
-    <div className={`notice notice-${type}`}>
-      <span>{type === "success" ? "✓" : type === "error" ? "✕" : "ℹ"}</span>
-      {text}
-      {onClose && <button onClick={onClose} className="modal-close" style={{ marginLeft: "auto", fontSize: 14 }}>×</button>}
-    </div>
-  );
-}
-
-function Spinner() {
-  return <div className="loading"><div className="spinner" /><span>Loading…</span></div>;
-}
 
 /* ════════════════════════════════════════════════════════════════
    AUTH
@@ -234,13 +185,6 @@ function Overview({ user, stats }) {
       </div>
     </>
   );
-}
-
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "morning";
-  if (h < 17) return "afternoon";
-  return "evening";
 }
 
 /* ════════════════════════════════════════════════════════════════

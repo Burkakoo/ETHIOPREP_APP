@@ -12,12 +12,18 @@ import questionBankRoutes from "./routes/questionBank.routes.js";
 import notesRoutes from "./routes/notes.routes.js";
 import bookmarkRoutes from "./routes/bookmark.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import { apiRateLimit } from "./middleware/rateLimit.middleware.js";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler.middleware.js";
 
 export const app = express();
 
 app.disable("x-powered-by");
 app.use(helmet());
-app.use(cors({ origin: env.clientOrigin }));
+app.use(cors({
+  origin: env.clientOrigins,
+  credentials: true
+}));
+app.use(apiRateLimit);
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ limit: "15mb", extended: true }));
 
@@ -40,11 +46,5 @@ app.use("/api/bookmarks", bookmarkRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/users", userRoutes);
 
-app.use((_request, response) => {
-  response.status(404).json({ error: "Route not found." });
-});
-
-app.use((error, _request, response, _next) => {
-  console.error(error);
-  response.status(500).json({ error: "Internal server error." });
-});
+app.use(notFoundHandler);
+app.use(errorHandler);
