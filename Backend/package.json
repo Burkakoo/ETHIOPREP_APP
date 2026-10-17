@@ -1,0 +1,22 @@
+{
+  "name": "ethioprep-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "EthioPrep Express and MongoDB Atlas backend",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "seed": "node src/seeds/seed.js",
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/config/env.js && node --check src/config/database.js && node --check src/config/jwt.js && node --check src/models/User.js && node --check src/models/Subject.js && node --check src/models/Chapter.js && node --check src/models/Question.js && node --check src/models/Note.js && node --check src/models/SyncChange.js && node --check src/models/LearningProgress.js && node --check src/models/Exam.js && node --check src/models/ExamAttempt.js && node --check src/models/Payment.js && node --check src/models/Subscription.js && node --check src/models/AnalyticsEvent.js && node --check src/models/AnalyticsDaily.js && node --check src/services/auth.service.js && node --check src/services/exam.service.js && node --check src/services/payment.service.js && node --check src/services/questionBank.service.js && node --check src/services/progress.service.js && node --check src/services/sync.service.js && node --check src/validators/auth.validator.js && node --check src/validators/exam.validator.js && node --check src/validators/payment.validator.js && node --check src/validators/questionBank.validator.js && node --check src/seeds/seed.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.19.1"
+  }
+}

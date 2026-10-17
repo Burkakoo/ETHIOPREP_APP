@@ -1,0 +1,15 @@
+{
+  "name": "ethioprep",
+  "version": "0.1.0",
+  "private": true,
+  "description": "EthioPrep entrance exam preparation platform",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix Backend run dev",
+    "start": "npm --prefix Backend run start",
+    "web:dev": "npm --prefix Web run dev",
+    "web:build": "npm --prefix Web run build",
+    "mobile:start": "npm --prefix Mobile start",
+    "check": "npm --prefix Backend run check"
+  }
+}
