@@ -7,6 +7,9 @@
     "userInterfaceStyle": "light",
     "splash": { "backgroundColor": "#0d7c66" },
     "android": { "package": "com.ethioprep.mobile" },
-    "ios": { "bundleIdentifier": "com.ethioprep.mobile" }
+    "ios": { "bundleIdentifier": "com.ethioprep.mobile" },
+    "plugins": [
+      "expo-asset"
+    ]
   }
 }

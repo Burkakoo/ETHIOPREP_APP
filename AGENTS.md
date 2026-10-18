@@ -45,7 +45,10 @@ npm run mobile:start # Mobile Expo
 
 ## Environment Configuration
 
-### Backend (.env)
+### Backend environment (repository-root `.env`)
+Copy `Backend/.env.example` to the repository-root `.env`; the backend loads
+that root-level file.
+
 ```env
 PORT=5000
 NODE_ENV=development
@@ -58,14 +61,14 @@ CLIENT_ORIGINS=http://localhost:5173,https://your-production-domain.com
 
 ### Web (.env)
 ```env
-VITE_API_URL=http://localhost:5000
+VITE_API_URL=http://localhost:5000/api
 ```
 
 ### Mobile (.env)
 ```env
-EXPO_PUBLIC_API_URL=http://localhost:5000
-# For Android emulator: http://10.0.2.2:5000
-# For physical device: http://192.168.x.x:5000
+EXPO_PUBLIC_API_URL=http://localhost:5000/api
+# For Android emulator: http://10.0.2.2:5000/api
+# For physical device: http://192.168.x.x:5000/api
 ```
 
 ## Completed Improvements (All Phases)
@@ -294,11 +297,12 @@ The following page components remain in main.jsx and should be extracted:
 
 **Metro Bundler Startup Issue** (Investigated 2026-10-18):
 - Symptom: Metro bundler hangs during startup at "Waiting on http://localhost:8081"
-- Root Cause: Likely React 19 compatibility issue with Expo 57
+- Root Cause: React 19 compatibility with the previous Expo 57 stack was suspected.
 - Current Stack:
-  - React: 19.2.3
-  - React Native: 0.86.3 (requires React 19)
-  - Expo: ~57.0.30
+  - React: 18.3.1
+  - React Native: 0.76.9
+  - Expo: ~52.0.0
+- The stack has moved to Expo SDK 52 / React 18.3.1.
 - Attempts to Fix:
   - ✅ Created babel.config.js with babel-preset-expo preset
   - ✅ Created metro.config.js with Expo defaults
@@ -308,10 +312,10 @@ The following page components remain in main.jsx and should be extracted:
   - ❌ Tried --tunnel flag (requires ngrok, unrelated issue)
 - Workaround Options:
   1. Use Expo Go app on physical device (bypasses bundler issues)
-  2. Downgrade to Expo 52 (requires React 18, React Native 0.76)
+  2. Use Expo SDK 52 / React 18.3.1 (current stack)
   3. Wait for Expo 58+ with better React 19 support
   4. Use EAS Build for production builds
-- Current Status: Development environment has bundler issues; app code is valid
+- Current Status: The Android bundle builds with Expo SDK 52; the prior Metro startup symptom is not otherwise confirmed fixed.
 
 **Security Vulnerabilities** (22 total - 7 moderate, 15 high):
 - Located in Expo build tooling transitive dependencies:
