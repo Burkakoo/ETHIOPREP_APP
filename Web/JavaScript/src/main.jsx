@@ -1,8 +1,44 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import {
+  BarChart3Icon,
+  BookMarkedIcon,
+  BookOpenIcon,
+  CalendarDaysIcon,
+  CheckIcon,
+  CircleAlertIcon,
+  CircleCheckIcon,
+  CircleHelpIcon,
+  CircleXIcon,
+  CreditCardIcon,
+  CrownIcon,
+  DownloadIcon,
+  EyeIcon,
+  EyeOffIcon,
+  FileTextIcon,
+  FolderOpenIcon,
+  HourglassIcon,
+  ImageIcon,
+  LayoutDashboardIcon,
+  Loader2Icon,
+  LockIcon,
+  LogInIcon,
+  LogOutIcon,
+  MailIcon,
+  MenuIcon,
+  PlusIcon,
+  ReceiptIcon,
+  ShieldCheckIcon,
+  SmartphoneIcon,
+  TrendingUpIcon,
+  UsersIcon,
+  WalletIcon,
+  XIcon,
+  ZapIcon
+} from "lucide-react";
 import { apiRequest, clearSession, saveSession } from "./services/api.js";
 import { roleBadge, statusBadge } from "./components/Badge.jsx";
-import { Spinner } from "./components/Spinner.jsx";
+import { SkeletonStats, SkeletonTable } from "./components/Spinner.jsx";
 import { Notice } from "./components/Notice.jsx";
 import { fmtDate, getGreeting } from "./utils/helpers.js";
 import "../../CSS/styles.css";
@@ -15,6 +51,7 @@ function Auth({ onLogin }) {
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [studentNotice, setStudentNotice] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function submitLogin(e) {
@@ -63,8 +100,8 @@ function Auth({ onLogin }) {
           lineHeight: 1.5,
           color: "var(--text-2)"
         }}>
-          <strong style={{ color: "var(--primary-light)", display: "block", marginBottom: 3 }}>
-            🛡️ Staff Access Only
+          <strong style={{ color: "var(--primary-light)", display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+            <ShieldCheckIcon size={15} /> Staff Access Only
           </strong>
           This portal is reserved for <strong>Administrators</strong>, <strong>Content Managers</strong>, and <strong>Cash Managers</strong>.
         </div>
@@ -73,35 +110,55 @@ function Auth({ onLogin }) {
         <p className="subtitle">Sign in to manage curriculum, exams, materials, and finances.</p>
 
         {error && (
-          <div className="auth-error" style={{ lineHeight: 1.5 }}>
-            {studentNotice && <span style={{ fontSize: 18, display: "block", marginBottom: 4 }}>📱</span>}
-            {error}
+          <div className="auth-error" role="alert">
+            {studentNotice ? <SmartphoneIcon size={18} className="auth-error-icon" /> : <CircleAlertIcon size={18} className="auth-error-icon" />}
+            <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={submitLogin}>
           <div className="field">
-            <label>Staff Email address</label>
+            <label htmlFor="auth-email">Staff Email address</label>
+            <div className="input-with-icon">
+            <MailIcon size={16} className="input-icon" aria-hidden="true" />
             <input
+              id="auth-email"
+              autoComplete="email"
               type="email"
               required
               placeholder="admin@ethioprep.com"
               value={loginForm.email}
               onChange={e => setLoginForm({ ...loginForm, email: e.target.value })}
             />
+            </div>
           </div>
           <div className="field">
-            <label>Password</label>
+            <label htmlFor="auth-password">Password</label>
+            <div className="input-with-icon">
+            <LockIcon size={16} className="input-icon" aria-hidden="true" />
             <input
-              type="password"
+              id="auth-password"
+              autoComplete="current-password"
+              type={showPassword ? "text" : "password"}
               required
               placeholder="••••••••"
               value={loginForm.password}
               onChange={e => setLoginForm({ ...loginForm, password: e.target.value })}
             />
+            <button
+              type="button"
+              className="input-action"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword(v => !v)}
+            >
+              {showPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+            </button>
+            </div>
           </div>
           <button type="submit" className="btn btn-primary btn-full" disabled={loading} style={{ marginTop: 8 }}>
-            {loading ? "Authenticating…" : "Sign In to Management Portal"}
+            {loading
+              ? <><Loader2Icon size={16} className="spin" /> Authenticating…</>
+              : <><LogInIcon size={16} /> Sign In to Management Portal</>}
           </button>
         </form>
 
@@ -114,7 +171,7 @@ function Auth({ onLogin }) {
           color: "var(--text-3)",
           lineHeight: 1.5
         }}>
-          📱 <strong>Are you an entrance examination student?</strong><br />
+          <SmartphoneIcon size={14} style={{ verticalAlign: "-2px", marginRight: 4 }} /><strong>Are you an entrance examination student?</strong><br />
           Students must use the <strong>EthioPrep Mobile Application</strong> to practice questions, study offline, take mock exams, and rank on the leaderboard.
         </div>
       </div>
@@ -128,17 +185,17 @@ function Auth({ onLogin }) {
 
 function Overview({ user, stats }) {
   const items = [
-    { label: "Subjects", value: stats.subjects, icon: "📚", cls: "icon-green" },
-    { label: "Questions", value: stats.questions, icon: "❓", cls: "icon-blue" },
-    { label: "Exams Published", value: stats.exams, icon: "📝", cls: "icon-purple" },
-    { label: "Pending Payments", value: stats.pendingPayments, icon: "💳", cls: "icon-amber" },
+    { label: "Subjects", value: stats.subjects, icon: <BookOpenIcon size={18} strokeWidth={2} />, cls: "icon-green" },
+    { label: "Questions", value: stats.questions, icon: <CircleHelpIcon size={18} strokeWidth={2} />, cls: "icon-blue" },
+    { label: "Exams Published", value: stats.exams, icon: <FileTextIcon size={18} strokeWidth={2} />, cls: "icon-purple" },
+    { label: "Pending Payments", value: stats.pendingPayments, icon: <CreditCardIcon size={18} strokeWidth={2} />, cls: "icon-amber" },
   ];
 
   return (
     <>
       <div className="page-header">
         <div className="breadcrumb"><span>Dashboard</span></div>
-        <h1>Good {getGreeting()}, {user.displayName.split(" ")[0]} 👋</h1>
+        <h1>Good {getGreeting()}, {user.displayName.split(" ")[0]}</h1>
         <p className="page-desc">Here's what's happening on EthioPrep right now.</p>
       </div>
       <div className="content-body">
@@ -173,8 +230,8 @@ function Overview({ user, stats }) {
                   <tr key={cap}>
                     <td>{cap}</td>
                     <td>{roles.includes(user.role)
-                      ? <span className="badge badge-green">✓ Allowed</span>
-                      : <span className="badge badge-gray">✕ No Access</span>}
+                      ? <span className="badge badge-green"><CheckIcon size={12} /> Allowed</span>
+                      : <span className="badge badge-gray"><XIcon size={12} /> No Access</span>}
                     </td>
                   </tr>
                 ))}
@@ -243,7 +300,7 @@ function SubjectsPage({ user }) {
             <h1>Subjects</h1>
             <p className="page-desc">Manage exam subject categories for the question bank.</p>
           </div>
-          {canManage && <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ New Subject</button>}
+          {canManage && <button className="btn btn-primary" onClick={() => setShowModal(true)}><PlusIcon size={16} /> New Subject</button>}
         </div>
       </div>
       <div className="content-body">
@@ -252,7 +309,7 @@ function SubjectsPage({ user }) {
           <div className="panel-header">
             <span className="panel-title">All Subjects ({subjects.length})</span>
           </div>
-          {loading ? <Spinner /> : (
+          {loading ? <SkeletonTable /> : (
             <div className="table-wrap">
               <table>
                 <thead>
@@ -260,7 +317,7 @@ function SubjectsPage({ user }) {
                 </thead>
                 <tbody>
                   {subjects.length === 0 ? (
-                    <tr><td colSpan={6}><div className="empty-state"><div className="empty-icon">📚</div><h3>No subjects yet</h3><p>Create your first subject to start building the question bank.</p></div></td></tr>
+                    <tr><td colSpan={6}><div className="empty-state"><div className="empty-icon"><BookOpenIcon size={26} strokeWidth={1.75} /></div><h3>No subjects yet</h3><p>Create your first subject to start building the question bank.</p></div></td></tr>
                   ) : subjects.map(s => (
                     <tr key={s._id}>
                       <td><strong>{s.name}</strong></td>
@@ -283,7 +340,7 @@ function SubjectsPage({ user }) {
           <div className="modal">
             <div className="modal-header">
               <h2>New Subject</h2>
-              <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+              <button className="modal-close" onClick={() => setShowModal(false)} aria-label="Close"><XIcon size={18} /></button>
             </div>
             <form onSubmit={createSubject}>
               <div className="modal-body">
@@ -382,7 +439,7 @@ function QuestionsPage({ user }) {
         <div className="breadcrumb"><span>Content</span><span className="sep">›</span><span>Question Bank</span></div>
         <div className="page-header-row">
           <div><h1>Question Bank</h1><p className="page-desc">Create and manage questions for all subjects.</p></div>
-          {canManage && <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ New Question</button>}
+          {canManage && <button className="btn btn-primary" onClick={() => setShowModal(true)}><PlusIcon size={16} /> New Question</button>}
         </div>
       </div>
       <div className="content-body">
@@ -397,7 +454,7 @@ function QuestionsPage({ user }) {
               </select>
             </div>
           </div>
-          {loading ? <Spinner /> : (
+          {loading ? <SkeletonTable /> : (
             <div className="table-wrap">
               <table>
                 <thead>
@@ -405,7 +462,7 @@ function QuestionsPage({ user }) {
                 </thead>
                 <tbody>
                   {questions.length === 0 ? (
-                    <tr><td colSpan={7}><div className="empty-state"><div className="empty-icon">❓</div><h3>No questions found</h3><p>Add questions to start building exams.</p></div></td></tr>
+                    <tr><td colSpan={7}><div className="empty-state"><div className="empty-icon"><CircleHelpIcon size={26} strokeWidth={1.75} /></div><h3>No questions found</h3><p>Add questions to start building exams.</p></div></td></tr>
                   ) : questions.map((q, i) => {
                     const subj = subjects.find(s => s._id === String(q.subjectId));
                     return (
@@ -432,7 +489,7 @@ function QuestionsPage({ user }) {
           <div className="modal modal-lg">
             <div className="modal-header">
               <h2>New Question</h2>
-              <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+              <button className="modal-close" onClick={() => setShowModal(false)} aria-label="Close"><XIcon size={18} /></button>
             </div>
             <form onSubmit={createQuestion}>
               <div className="modal-body">
@@ -595,14 +652,14 @@ function ExamsPage({ user }) {
         <div className="breadcrumb"><span>Content</span><span className="sep">›</span><span>Exams</span></div>
         <div className="page-header-row">
           <div><h1>Exams</h1><p className="page-desc">Create, publish, and archive practice exams for students.</p></div>
-          {canManage && <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ New Exam</button>}
+          {canManage && <button className="btn btn-primary" onClick={() => setShowModal(true)}><PlusIcon size={16} /> New Exam</button>}
         </div>
       </div>
       <div className="content-body">
         <Notice text={msg.text} type={msg.type} onClose={() => setMsg({ text: "" })} />
         <div className="panel">
           <div className="panel-header"><span className="panel-title">All Exams ({exams.length})</span></div>
-          {loading ? <Spinner /> : (
+          {loading ? <SkeletonTable /> : (
             <div className="table-wrap">
               <table>
                 <thead>
@@ -610,7 +667,7 @@ function ExamsPage({ user }) {
                 </thead>
                 <tbody>
                   {exams.length === 0 ? (
-                    <tr><td colSpan={7}><div className="empty-state"><div className="empty-icon">📝</div><h3>No exams yet</h3><p>Create your first exam to make it available to students.</p></div></td></tr>
+                    <tr><td colSpan={7}><div className="empty-state"><div className="empty-icon"><FileTextIcon size={26} strokeWidth={1.75} /></div><h3>No exams yet</h3><p>Create your first exam to make it available to students.</p></div></td></tr>
                   ) : exams.map(ex => (
                     <tr key={ex._id}>
                       <td><strong>{ex.title}</strong><div className="td-muted" style={{ fontSize: 12, marginTop: 2 }}>{ex.description || ""}</div></td>
@@ -639,7 +696,7 @@ function ExamsPage({ user }) {
           <div className="modal modal-lg">
             <div className="modal-header">
               <h2>New Exam</h2>
-              <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+              <button className="modal-close" onClick={() => setShowModal(false)} aria-label="Close"><XIcon size={18} /></button>
             </div>
             <form onSubmit={createExam}>
               <div className="modal-body">
@@ -748,12 +805,12 @@ function PaymentsPage({ user }) {
         {dashboard && (
           <div className="stats-grid" style={{ gridTemplateColumns: "repeat(3,1fr)", marginBottom: 24 }}>
             {[
-              { label: "Pending Review", value: dashboard.pendingPayments || 0, icon: "⏳", cls: "icon-amber" },
-              { label: "Approved Payments", value: dashboard.approvedPayments ?? dashboard.verifiedPayments ?? 0, icon: "✅", cls: "icon-green" },
-              { label: "Rejected Payments", value: dashboard.rejectedPayments || 0, icon: "❌", cls: "icon-red" },
-              { label: "Today's Revenue", value: `${dashboard.todayRevenue?.toLocaleString() || 0} ETB`, icon: "📅", cls: "icon-blue" },
-              { label: "Monthly Revenue", value: `${dashboard.monthlyRevenue?.toLocaleString() || 0} ETB`, icon: "📈", cls: "icon-purple" },
-              { label: "Total Revenue", value: `${(dashboard.totalRevenue ?? dashboard.totalVerifiedAmount)?.toLocaleString() || 0} ETB`, icon: "💰", cls: "icon-green" },
+              { label: "Pending Review", value: dashboard.pendingPayments || 0, icon: <HourglassIcon size={18} strokeWidth={2} />, cls: "icon-amber" },
+              { label: "Approved Payments", value: dashboard.approvedPayments ?? dashboard.verifiedPayments ?? 0, icon: <CircleCheckIcon size={18} strokeWidth={2} />, cls: "icon-green" },
+              { label: "Rejected Payments", value: dashboard.rejectedPayments || 0, icon: <CircleXIcon size={18} strokeWidth={2} />, cls: "icon-red" },
+              { label: "Today's Revenue", value: `${dashboard.todayRevenue?.toLocaleString() || 0} ETB`, icon: <CalendarDaysIcon size={18} strokeWidth={2} />, cls: "icon-blue" },
+              { label: "Monthly Revenue", value: `${dashboard.monthlyRevenue?.toLocaleString() || 0} ETB`, icon: <TrendingUpIcon size={18} strokeWidth={2} />, cls: "icon-purple" },
+              { label: "Total Revenue", value: `${(dashboard.totalRevenue ?? dashboard.totalVerifiedAmount)?.toLocaleString() || 0} ETB`, icon: <WalletIcon size={18} strokeWidth={2} />, cls: "icon-green" },
             ].map(s => (
               <div key={s.label} className="stat-card">
                 <div className="stat-header"><span className="stat-label">{s.label}</span><div className={`stat-icon ${s.cls}`}>{s.icon}</div></div>
@@ -765,7 +822,7 @@ function PaymentsPage({ user }) {
 
         <div className="panel">
           <div className="panel-header"><span className="panel-title">All Payments ({payments.length})</span></div>
-          {loading ? <Spinner /> : (
+          {loading ? <SkeletonTable /> : (
             <div className="table-wrap">
               <table>
                 <thead>
@@ -781,7 +838,7 @@ function PaymentsPage({ user }) {
                 </thead>
                 <tbody>
                   {payments.length === 0 ? (
-                    <tr><td colSpan={7}><div className="empty-state"><div className="empty-icon">💳</div><h3>No payments yet</h3></div></td></tr>
+                    <tr><td colSpan={7}><div className="empty-state"><div className="empty-icon"><CreditCardIcon size={26} strokeWidth={1.75} /></div><h3>No payments yet</h3></div></td></tr>
                   ) : payments.map(p => (
                     <tr key={p._id}>
                       <td><strong>{p.fullName || "Student"}</strong></td>
@@ -810,7 +867,7 @@ function PaymentsPage({ user }) {
                               marginTop: 4
                             }}
                           >
-                            📷 View Receipt
+                            <ImageIcon size={14} /> View Receipt
                           </button>
                         )}
                         {!p.transactionReference && !p.receiptUrl && "—"}
@@ -886,13 +943,13 @@ function PaymentsPage({ user }) {
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", width: "100%", marginBottom: 12, alignItems: "center" }}>
-              <strong style={{ fontSize: 15, color: "var(--text)" }}>🧾 Receipt Evidence Screenshot</strong>
+              <strong style={{ fontSize: 15, color: "var(--text)" }}><ReceiptIcon size={16} style={{ verticalAlign: "-3px", marginRight: 6 }} />Receipt Evidence Screenshot</strong>
               <button
                 className="btn btn-sm btn-ghost"
                 onClick={() => setPreviewImage(null)}
                 style={{ fontSize: 13, cursor: "pointer" }}
               >
-                ✕ Close
+                <XIcon size={14} /> Close
               </button>
             </div>
             <img
@@ -1008,7 +1065,7 @@ function StaffNotesPage({ user }) {
           </div>
           {canManage && (
             <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-              + Upload / Create Note
+              <PlusIcon size={16} /> Upload / Create Note
             </button>
           )}
         </div>
@@ -1031,7 +1088,7 @@ function StaffNotesPage({ user }) {
           <div className="panel-header">
             <span className="panel-title">Study Materials & Notes ({notes.length})</span>
           </div>
-          {loading ? <Spinner /> : (
+          {loading ? <SkeletonTable /> : (
             <div className="table-wrap">
               <table>
                 <thead>
@@ -1061,7 +1118,7 @@ function StaffNotesPage({ user }) {
                       <td>
                         {n.fileUrl ? (
                           <a href={n.fileUrl} target="_blank" rel="noreferrer" style={{ color: "var(--green)", textDecoration: "underline" }}>
-                            📥 View File
+                            <DownloadIcon size={14} /> View File
                           </a>
                         ) : (
                           <span className="td-muted">Text Note</span>
@@ -1091,7 +1148,7 @@ function StaffNotesPage({ user }) {
           <div className="modal">
             <div className="modal-header">
               <h2>New Educational Note / Document</h2>
-              <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+              <button className="modal-close" onClick={() => setShowModal(false)} aria-label="Close"><XIcon size={18} /></button>
             </div>
             <form onSubmit={createNote}>
               <div className="modal-body">
@@ -1226,7 +1283,7 @@ function UsersPage() {
 
         <div className="panel">
           <div className="panel-header"><span className="panel-title">Registered Accounts ({users.length})</span></div>
-          {loading ? <Spinner /> : (
+          {loading ? <SkeletonTable /> : (
             <div className="table-wrap">
               <table>
                 <thead>
@@ -1264,7 +1321,7 @@ function UsersPage() {
                       </td>
                       <td>
                         <span className={`badge ${u.isPremium ? "badge-green" : "badge-gray"}`}>
-                          {u.isPremium ? "👑 Premium" : "Free"}
+                          {u.isPremium ? <><CrownIcon size={12} /> Premium</> : "Free"}
                         </span>
                       </td>
                       <td>{statusBadge(u.status)}</td>
@@ -1316,17 +1373,17 @@ function AnalyticsPage() {
       </div>
 
       <div className="content-body">
-        {loading ? <Spinner /> : (
+        {loading ? <SkeletonStats count={6} /> : (
           <>
             {adminStats && (
               <div className="stats-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: 24 }}>
                 {[
-                  { label: "Total Registered Users", value: adminStats.totalUsers, icon: "👥", cls: "icon-blue" },
-                  { label: "Active Platform Users", value: adminStats.activeUsers, icon: "⚡", cls: "icon-green" },
-                  { label: "Premium Paid Users", value: adminStats.premiumUsers, icon: "👑", cls: "icon-amber" },
-                  { label: "Questions in Bank", value: adminStats.totalQuestions, icon: "❓", cls: "icon-purple" },
-                  { label: "Published Mock Exams", value: adminStats.totalExams, icon: "📝", cls: "icon-blue" },
-                  { label: "Total Revenue Generated", value: `${adminStats.totalRevenue?.toLocaleString() || 0} ETB`, icon: "💰", cls: "icon-green" },
+                  { label: "Total Registered Users", value: adminStats.totalUsers, icon: <UsersIcon size={18} strokeWidth={2} />, cls: "icon-blue" },
+                  { label: "Active Platform Users", value: adminStats.activeUsers, icon: <ZapIcon size={18} strokeWidth={2} />, cls: "icon-green" },
+                  { label: "Premium Paid Users", value: adminStats.premiumUsers, icon: <CrownIcon size={18} strokeWidth={2} />, cls: "icon-amber" },
+                  { label: "Questions in Bank", value: adminStats.totalQuestions, icon: <CircleHelpIcon size={18} strokeWidth={2} />, cls: "icon-purple" },
+                  { label: "Published Mock Exams", value: adminStats.totalExams, icon: <FileTextIcon size={18} strokeWidth={2} />, cls: "icon-blue" },
+                  { label: "Total Revenue Generated", value: `${adminStats.totalRevenue?.toLocaleString() || 0} ETB`, icon: <WalletIcon size={18} strokeWidth={2} />, cls: "icon-green" },
                 ].map(s => (
                   <div key={s.label} className="stat-card">
                     <div className="stat-header"><span className="stat-label">{s.label}</span><div className={`stat-icon ${s.cls}`}>{s.icon}</div></div>
@@ -1341,7 +1398,7 @@ function AnalyticsPage() {
               <div className="panel-body">
                 {summary.length === 0 ? (
                   <div className="empty-state">
-                    <div className="empty-icon">📊</div>
+                    <div className="empty-icon"><BarChart3Icon size={26} strokeWidth={1.75} /></div>
                     <h3>Activity tracking active</h3>
                     <p>Usage metrics will aggregate here as students continue practicing offline and online.</p>
                   </div>
@@ -1427,7 +1484,7 @@ function ChaptersPage({ user }) {
         <div className="breadcrumb"><span>Content</span><span className="sep">›</span><span>Chapters</span></div>
         <div className="page-header-row">
           <div><h1>Chapters</h1><p className="page-desc">Organise subjects into chapters for structured learning.</p></div>
-          {canManage && selectedSubject && <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ New Chapter</button>}
+          {canManage && selectedSubject && <button className="btn btn-primary" onClick={() => setShowModal(true)}><PlusIcon size={16} /> New Chapter</button>}
         </div>
       </div>
       <div className="content-body">
@@ -1445,13 +1502,13 @@ function ChaptersPage({ user }) {
         {selectedSubject && (
           <div className="panel">
             <div className="panel-header"><span className="panel-title">Chapters ({chapters.length})</span></div>
-            {loading ? <Spinner /> : (
+            {loading ? <SkeletonTable /> : (
               <div className="table-wrap">
                 <table>
                   <thead><tr><th>Order</th><th>Title</th><th>Description</th><th>Status</th>{canManage && <th></th>}</tr></thead>
                   <tbody>
                     {chapters.length === 0 ? (
-                      <tr><td colSpan={5}><div className="empty-state"><div className="empty-icon">📂</div><h3>No chapters yet</h3></div></td></tr>
+                      <tr><td colSpan={5}><div className="empty-state"><div className="empty-icon"><FolderOpenIcon size={26} strokeWidth={1.75} /></div><h3>No chapters yet</h3></div></td></tr>
                     ) : chapters.map(c => (
                       <tr key={c._id}>
                         <td className="td-muted">{c.order}</td>
@@ -1472,7 +1529,7 @@ function ChaptersPage({ user }) {
       {showModal && (
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
           <div className="modal">
-            <div className="modal-header"><h2>New Chapter</h2><button className="modal-close" onClick={() => setShowModal(false)}>×</button></div>
+            <div className="modal-header"><h2>New Chapter</h2><button className="modal-close" onClick={() => setShowModal(false)} aria-label="Close"><XIcon size={18} /></button></div>
             <form onSubmit={createChapter}>
               <div className="modal-body">
                 <div className="form-grid">
@@ -1499,6 +1556,14 @@ function ChaptersPage({ user }) {
 
 function Dashboard({ user, onLogout }) {
   const [page, setPage] = useState("overview");
+  const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    if (!navOpen) return undefined;
+    const onKey = e => { if (e.key === "Escape") setNavOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navOpen]);
   const [stats, setStats] = useState({ subjects: 0, questions: 0, exams: 0, pendingPayments: 0 });
 
   useEffect(() => {
@@ -1518,23 +1583,23 @@ function Dashboard({ user, onLogout }) {
   const isAdmin = user.role === "admin";
 
   const nav = [
-    { id: "overview", label: "Overview", icon: "⊞" },
+    { id: "overview", label: "Overview", icon: <LayoutDashboardIcon size={18} strokeWidth={2} /> },
     ...(canContent ? [
       { section: "Content Management" },
-      { id: "subjects",  label: "Subjects",      icon: "📚" },
-      { id: "chapters",  label: "Chapters",       icon: "📂" },
-      { id: "questions", label: "Question Bank",  icon: "❓" },
-      { id: "exams",     label: "Exams",          icon: "📝" },
-      { id: "notes",     label: "Study Notes",    icon: "📖" },
+      { id: "subjects",  label: "Subjects",      icon: <BookOpenIcon size={18} strokeWidth={2} /> },
+      { id: "chapters",  label: "Chapters",       icon: <FolderOpenIcon size={18} strokeWidth={2} /> },
+      { id: "questions", label: "Question Bank",  icon: <CircleHelpIcon size={18} strokeWidth={2} /> },
+      { id: "exams",     label: "Exams",          icon: <FileTextIcon size={18} strokeWidth={2} /> },
+      { id: "notes",     label: "Study Notes",    icon: <BookMarkedIcon size={18} strokeWidth={2} /> },
     ] : []),
     ...(canFinance ? [
       { section: "Finance" },
-      { id: "payments",  label: "Payments",       icon: "💳" },
+      { id: "payments",  label: "Payments",       icon: <CreditCardIcon size={18} strokeWidth={2} /> },
     ] : []),
     ...(isAdmin ? [
       { section: "Administration" },
-      { id: "users",     label: "Users",          icon: "👥" },
-      { id: "analytics", label: "Analytics",      icon: "📊" },
+      { id: "users",     label: "Users",          icon: <UsersIcon size={18} strokeWidth={2} /> },
+      { id: "analytics", label: "Analytics",      icon: <BarChart3Icon size={18} strokeWidth={2} /> },
     ] : []),
   ];
 
@@ -1555,21 +1620,43 @@ function Dashboard({ user, onLogout }) {
 
   return (
     <div className="app-shell">
+      {/* ── Mobile top bar ── */}
+      <header className="mobile-topbar">
+        <button className="icon-btn" aria-label="Open navigation" aria-expanded={navOpen} onClick={() => setNavOpen(true)}>
+          <MenuIcon size={20} />
+        </button>
+        <div className="mobile-brand">
+          <div className="sidebar-logo">E</div>
+          <span>Ethio<b>Prep</b></span>
+        </div>
+        <div className="user-avatar" title={user.displayName}>{user.displayName[0].toUpperCase()}</div>
+      </header>
+      <div className={`drawer-backdrop ${navOpen ? "open" : ""}`} onClick={() => setNavOpen(false)} aria-hidden="true" />
+
       {/* ── Sidebar ── */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${navOpen ? "open" : ""}`} aria-label="Main navigation">
         <div className="sidebar-header">
           <div className="sidebar-logo">E</div>
           <div>
             <div className="sidebar-title">EthioPrep</div>
             <div className="sidebar-subtitle">Staff Portal</div>
           </div>
+          <button className="icon-btn drawer-close" aria-label="Close navigation" onClick={() => setNavOpen(false)}>
+            <XIcon size={18} />
+          </button>
         </div>
 
         <nav className="sidebar-nav">
           {nav.map((item, i) => {
             if (item.section) return <div key={i} className="nav-section-label">{item.section}</div>;
             return (
-              <button key={item.id} className={`nav-item ${page === item.id ? "active" : ""}`} onClick={() => setPage(item.id)}>
+              <button
+                key={item.id}
+                className={`nav-item ${page === item.id ? "active" : ""}`}
+                aria-current={page === item.id ? "page" : undefined}
+                title={item.label}
+                onClick={() => { setPage(item.id); setNavOpen(false); }}
+              >
                 <span className="nav-icon">{item.icon}</span>
                 <span>{item.label}</span>
               </button>
@@ -1584,7 +1671,7 @@ function Dashboard({ user, onLogout }) {
               <div className="user-name">{user.displayName}</div>
               <div className="user-role">{ROLE_LABELS[user.role] || user.role}</div>
             </div>
-            <button className="signout-btn" title="Sign out" onClick={() => { clearSession(); onLogout(); }}>⏻</button>
+            <button className="signout-btn" title="Sign out" aria-label="Sign out" onClick={() => { clearSession(); onLogout(); }}><LogOutIcon size={16} /></button>
           </div>
         </div>
       </aside>
