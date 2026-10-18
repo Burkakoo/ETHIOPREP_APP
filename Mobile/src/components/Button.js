@@ -1,6 +1,15 @@
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, ActivityIndicator } from "react-native";
-import { COLORS, RADIUS, SPACING } from "../utils/theme.js";
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity } from "react-native";
+import { Icon } from "./Icon.js";
+import { COLORS, RADIUS, SPACING, TOUCH_TARGET } from "../utils/theme.js";
+
+const VARIANTS = {
+  primary: { bg: COLORS.primary, fg: COLORS.onPrimary, border: COLORS.primary },
+  secondary: { bg: COLORS.surfaceElevated, fg: COLORS.text, border: COLORS.borderLight },
+  outline: { bg: "transparent", fg: COLORS.primary, border: COLORS.primary },
+  ghost: { bg: "transparent", fg: COLORS.textMuted, border: "transparent" },
+  danger: { bg: COLORS.dangerBg, fg: COLORS.danger, border: "rgba(224, 80, 80, 0.3)" }
+};
 
 export function Button({
   children,
@@ -9,41 +18,34 @@ export function Button({
   size = "md",
   disabled = false,
   loading = false,
+  icon,
   style
 }) {
-  const isPrimary = variant === "primary";
-  const isSecondary = variant === "secondary";
-  const isOutline = variant === "outline";
+  const v = VARIANTS[variant] || VARIANTS.primary;
+  const isSmall = size === "sm";
 
   return (
     <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       activeOpacity={0.8}
       disabled={disabled || loading}
       onPress={onPress}
       style={[
         styles.base,
-        isPrimary && styles.primary,
-        isSecondary && styles.secondary,
-        isOutline && styles.outline,
-        size === "sm" && styles.sm,
+        { backgroundColor: v.bg, borderColor: v.border },
+        isSmall && styles.sm,
         (disabled || loading) && styles.disabled,
         style
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={isPrimary ? COLORS.text : COLORS.surface} size="small" />
+        <ActivityIndicator color={v.fg} size="small" />
       ) : (
-        <Text
-          style={[
-            styles.text,
-            isPrimary && styles.primaryText,
-            isSecondary && styles.secondaryText,
-            isOutline && styles.outlineText,
-            size === "sm" && styles.smText
-          ]}
-        >
-          {children}
-        </Text>
+        <>
+          {icon ? <Icon color={v.fg} name={icon} size={isSmall ? 15 : 18} /> : null}
+          <Text style={[styles.text, { color: v.fg }, isSmall && styles.smText]}>{children}</Text>
+        </>
       )}
     </TouchableOpacity>
   );
@@ -51,43 +53,29 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
+    minHeight: TOUCH_TARGET + 4,
     borderRadius: RADIUS.md,
-    paddingVertical: SPACING.md,
+    borderWidth: 1.5,
+    paddingVertical: SPACING.sm + 2,
     paddingHorizontal: SPACING.lg,
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row"
-  },
-  primary: {
-    backgroundColor: COLORS.accent
-  },
-  secondary: {
-    backgroundColor: COLORS.primary
-  },
-  outline: {
-    backgroundColor: "transparent",
-    borderWidth: 1.5,
-    borderColor: COLORS.primary
+    flexDirection: "row",
+    gap: SPACING.sm
   },
   sm: {
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md
+    minHeight: 36,
+    paddingVertical: SPACING.xs + 2,
+    paddingHorizontal: SPACING.md,
+    gap: 6
   },
   disabled: {
-    opacity: 0.6
+    opacity: 0.55
   },
   text: {
     fontWeight: "700",
-    fontSize: 15
-  },
-  primaryText: {
-    color: COLORS.text
-  },
-  secondaryText: {
-    color: COLORS.textLight
-  },
-  outlineText: {
-    color: COLORS.primary
+    fontSize: 15,
+    letterSpacing: 0.1
   },
   smText: {
     fontSize: 13

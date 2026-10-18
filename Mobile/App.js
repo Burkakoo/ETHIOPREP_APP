@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Header } from "./src/components/Header.js";
+import { Icon } from "./src/components/Icon.js";
 import { Notice } from "./src/components/Notice.js";
 import { AuthScreen } from "./src/screens/AuthScreen.js";
 import { HomeScreen } from "./src/screens/HomeScreen.js";
@@ -27,12 +29,12 @@ import { getQueue } from "./src/services/offlineQueue.js";
 import { COLORS, RADIUS, SPACING } from "./src/utils/theme.js";
 
 const TABS = [
-  { id: "home", label: "Home" },
-  { id: "exams", label: "Exams" },
-  { id: "notes", label: "Notes" },
-  { id: "progress", label: "Progress" },
-  { id: "payments", label: "Payments" },
-  { id: "profile", label: "Profile" }
+  { id: "home", label: "Home", icon: "home" },
+  { id: "exams", label: "Exams", icon: "document-text" },
+  { id: "notes", label: "Notes", icon: "book" },
+  { id: "progress", label: "Progress", icon: "stats-chart" },
+  { id: "payments", label: "Pay", icon: "card" },
+  { id: "profile", label: "Profile", icon: "person" }
 ];
 
 function generateId() {
@@ -217,7 +219,7 @@ function MainDashboard({ user, onLogout }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.container}>
         <Header
           onLogout={onLogout}
@@ -238,17 +240,28 @@ function MainDashboard({ user, onLogout }) {
         ) : (
           <>
             <View style={styles.tabBar}>
-              {TABS.map((t) => (
-                <TouchableOpacity
-                  key={t.id}
-                  onPress={() => setTab(t.id)}
-                  style={[styles.tabItem, tab === t.id && styles.activeTabItem]}
-                >
-                  <Text style={[styles.tabText, tab === t.id && styles.activeTabText]}>
-                    {t.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {TABS.map((t) => {
+                const active = tab === t.id;
+                return (
+                  <TouchableOpacity
+                    accessibilityLabel={t.label}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: active }}
+                    key={t.id}
+                    onPress={() => setTab(t.id)}
+                    style={[styles.tabItem, active && styles.activeTabItem]}
+                  >
+                    <Icon
+                      color={active ? COLORS.onPrimary : COLORS.textMuted}
+                      name={active ? t.icon : `${t.icon}-outline`}
+                      size={18}
+                    />
+                    <Text style={[styles.tabText, active && styles.activeTabText]}>
+                      {t.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {tab === "home" && (
@@ -338,7 +351,13 @@ export default function App() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingBrand}>EthioPrep</Text>
+        <View style={styles.loadingLogo}>
+          <Text style={styles.loadingLogoText}>E</Text>
+        </View>
+        <Text style={styles.loadingBrand}>
+          Ethio<Text style={{ color: COLORS.primary }}>Prep</Text>
+        </Text>
+        <ActivityIndicator color={COLORS.primary} style={{ marginTop: SPACING.lg }} />
       </View>
     );
   }
@@ -369,30 +388,48 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     flex: 1,
-    paddingVertical: SPACING.sm,
+    minHeight: 52,
+    paddingVertical: SPACING.xs + 2,
     alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
     borderRadius: RADIUS.sm
   },
   activeTabItem: {
     backgroundColor: COLORS.primary
   },
   tabText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "700",
     color: COLORS.textMuted
   },
   activeTabText: {
-    color: COLORS.textLight
+    color: COLORS.onPrimary
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: COLORS.primary
+    backgroundColor: COLORS.background
   },
-  loadingBrand: {
+  loadingLogo: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: SPACING.md
+  },
+  loadingLogoText: {
     fontSize: 32,
     fontWeight: "900",
-    color: COLORS.textLight
+    color: COLORS.onPrimary
+  },
+  loadingBrand: {
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: -0.6,
+    color: COLORS.text
   }
 });
