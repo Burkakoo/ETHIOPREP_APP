@@ -1,24 +1,45 @@
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { COLORS, RADIUS, SPACING } from "../utils/theme.js";
+import { Icon } from "./Icon.js";
+import { COLORS, RADIUS, SPACING, TOUCH_TARGET } from "../utils/theme.js";
 
 export function Header({ user, onLogout, onNavigateProfile, queueCount = 0 }) {
+  const initial = (user?.displayName || "S").charAt(0).toUpperCase();
+
   return (
     <View style={styles.header}>
-      <TouchableOpacity activeOpacity={0.7} onPress={onNavigateProfile} style={styles.userInfo}>
-        <Text style={styles.brand}>EthioPrep</Text>
-        <Text style={styles.userRole}>
-          {user?.displayName || "Student"} - {user?.role || "student"}
-        </Text>
+      <TouchableOpacity
+        accessibilityLabel="Open profile"
+        activeOpacity={0.7}
+        onPress={onNavigateProfile}
+        style={styles.userInfo}
+      >
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{initial}</Text>
+        </View>
+        <View style={styles.userText}>
+          <Text style={styles.brand}>
+            Ethio<Text style={styles.brandAccent}>Prep</Text>
+          </Text>
+          <Text numberOfLines={1} style={styles.userRole}>
+            {user?.displayName || "Student"} · {user?.role || "student"}
+          </Text>
+        </View>
       </TouchableOpacity>
       <View style={styles.actions}>
         {queueCount > 0 && (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>{queueCount} sync</Text>
+            <Icon color={COLORS.warning} name="cloud-upload-outline" size={13} />
+            <Text style={styles.badgeText}>{queueCount}</Text>
           </View>
         )}
-        <TouchableOpacity activeOpacity={0.7} onPress={onLogout} style={styles.logoutBtn}>
-          <Text style={styles.logoutText}>Sign out</Text>
+        <TouchableOpacity
+          accessibilityLabel="Sign out"
+          activeOpacity={0.7}
+          onPress={onLogout}
+          style={styles.logoutBtn}
+        >
+          <Icon color={COLORS.danger} name="log-out-outline" size={20} />
         </TouchableOpacity>
       </View>
     </View>
@@ -36,18 +57,41 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border
   },
   userInfo: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm + 2
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  avatarText: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: COLORS.onPrimary
+  },
+  userText: {
     flex: 1
   },
   brand: {
-    fontSize: 22,
-    fontWeight: "900",
-    color: COLORS.primary,
-    letterSpacing: 0.3
+    fontSize: 20,
+    fontWeight: "800",
+    color: COLORS.text,
+    letterSpacing: -0.4
+  },
+  brandAccent: {
+    color: COLORS.primary
   },
   userRole: {
     fontSize: 12,
     color: COLORS.textMuted,
-    marginTop: 2
+    marginTop: 1,
+    textTransform: "capitalize"
   },
   actions: {
     flexDirection: "row",
@@ -55,9 +99,12 @@ const styles = StyleSheet.create({
     gap: SPACING.sm
   },
   badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     backgroundColor: COLORS.warningBg,
     paddingHorizontal: SPACING.sm,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: RADIUS.full,
     borderWidth: 1,
     borderColor: COLORS.warning
@@ -68,12 +115,11 @@ const styles = StyleSheet.create({
     color: COLORS.warning
   },
   logoutBtn: {
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.sm
-  },
-  logoutText: {
-    color: COLORS.danger,
-    fontWeight: "700",
-    fontSize: 13
+    width: TOUCH_TARGET,
+    height: TOUCH_TARGET,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.dangerBg
   }
 });

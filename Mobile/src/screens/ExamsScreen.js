@@ -2,6 +2,8 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Button } from "../components/Button.js";
 import { Card } from "../components/Card.js";
+import { Icon } from "../components/Icon.js";
+import { EmptyState } from "../components/EmptyState.js";
 import { COLORS, RADIUS, SPACING } from "../utils/theme.js";
 
 export function ExamsScreen({ exams = [], onStartExam, loadingExamId, user }) {
@@ -42,16 +44,19 @@ export function ExamsScreen({ exams = [], onStartExam, loadingExamId, user }) {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>
-        {isNatural ? "🔬 Natural Science Exams" : "📚 Social Science Exams"}
+        <Icon color={COLORS.primary} name={isNatural ? "flask-outline" : "library-outline"} size={20} />{"  "}
+        {isNatural ? "Natural Science Exams" : "Social Science Exams"}
       </Text>
       <Text style={styles.subHeader}>
         Timed simulations based on Ethiopian EUEE blueprints for {isNatural ? "Natural" : "Social"} Science.
       </Text>
 
       {streamFilteredExams.length === 0 ? (
-        <Card>
-          <Text style={styles.emptyText}>No published exams currently available for your stream.</Text>
-        </Card>
+        <EmptyState
+          icon="document-text-outline"
+          message="No published exams currently available for your stream."
+          title="No exams yet"
+        />
       ) : (
         streamFilteredExams.map((item) => {
           const isPremium = item.accessLevel === "premium";

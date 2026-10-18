@@ -1,6 +1,6 @@
 import React from "react";
 
-const ROLE_LABELS = {
+export const ROLE_LABELS = {
   admin: "Administrator",
   content_manager: "Content Manager",
   cash_manager: "Cash Manager",

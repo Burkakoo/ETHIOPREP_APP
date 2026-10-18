@@ -5,6 +5,8 @@ import { Button } from "../components/Button.js";
 import { Card } from "../components/Card.js";
 import { Input } from "../components/Input.js";
 import { Notice } from "../components/Notice.js";
+import { Icon } from "../components/Icon.js";
+import { EmptyState } from "../components/EmptyState.js";
 import { COLORS, RADIUS, SPACING } from "../utils/theme.js";
 
 export const PAYMENT_METHODS = [
@@ -194,9 +196,9 @@ export function PaymentScreen({ payments = [], onSubmitPayment, submitting, user
           Complete preparation for Ethiopian University Entrance Exam (EUEE).
         </Text>
         <View style={styles.perksList}>
-          <Text style={styles.perkItem}>✓ All Natural & Social Science Subjects</Text>
-          <Text style={styles.perkItem}>✓ Timed National Mock Exams & Solutions</Text>
-          <Text style={styles.perkItem}>✓ Mistake Review, Progress Tracking & Leaderboard</Text>
+          <Text style={styles.perkItem}><Icon color={COLORS.primary} name="checkmark-circle" size={14} />{"  "}All Natural & Social Science Subjects</Text>
+          <Text style={styles.perkItem}><Icon color={COLORS.primary} name="checkmark-circle" size={14} />{"  "}Timed National Mock Exams & Solutions</Text>
+          <Text style={styles.perkItem}><Icon color={COLORS.primary} name="checkmark-circle" size={14} />{"  "}Mistake Review, Progress Tracking & Leaderboard</Text>
         </View>
       </Card>
 
@@ -224,13 +226,13 @@ export function PaymentScreen({ payments = [], onSubmitPayment, submitting, user
                 onPress={() => setSelectedProvider(method.id)}
                 style={[
                   styles.providerTab,
-                  isSelected && { borderColor: method.themeColor, backgroundColor: "#f0fdf4" }
+                  isSelected && { borderColor: COLORS.primary, backgroundColor: COLORS.primaryBg }
                 ]}
               >
                 <Text
                   style={[
                     styles.providerTabText,
-                    isSelected && { color: method.themeColor, fontWeight: "800" }
+                    isSelected && { color: COLORS.primary, fontWeight: "800" }
                   ]}
                 >
                   {method.name}
@@ -243,7 +245,7 @@ export function PaymentScreen({ payments = [], onSubmitPayment, submitting, user
         {/* Selected Account Detail Box */}
         <Card style={styles.accountCard}>
           <View style={styles.accountHeader}>
-            <Text style={[styles.accountMethodName, { color: activeMethod.themeColor }]}>
+            <Text style={[styles.accountMethodName, { color: COLORS.primary }]}>
               {activeMethod.name}
             </Text>
             <View style={styles.categoryBadge}>
@@ -369,14 +371,14 @@ export function PaymentScreen({ payments = [], onSubmitPayment, submitting, user
                     />
                     <View style={styles.previewMeta}>
                       <View style={styles.selectedBadge}>
-                        <Text style={styles.selectedBadgeText}>✓ Screenshot Selected</Text>
+                        <Text style={styles.selectedBadgeText}><Icon color={COLORS.success} name="checkmark-circle" size={13} /> Screenshot Selected</Text>
                       </View>
                       <TouchableOpacity
                         onPress={handleRemoveImage}
                         style={styles.removeImageBtn}
                         activeOpacity={0.7}
                       >
-                        <Text style={styles.removeImageText}>✕ Remove / Change</Text>
+                        <Text style={styles.removeImageText}><Icon color={COLORS.danger} name="close" size={13} /> Remove / Change</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -392,7 +394,7 @@ export function PaymentScreen({ payments = [], onSubmitPayment, submitting, user
                         <ActivityIndicator color={COLORS.primary} size="small" />
                       ) : (
                         <>
-                          <Text style={styles.browseIcon}>📁</Text>
+                          <Icon color={COLORS.info} name="images-outline" size={28} style={styles.browseIcon} />
                           <Text style={styles.browseBtnText}>Browse from Device</Text>
                           <Text style={styles.browseBtnSub}>Select from Photos / Gallery</Text>
                         </>
@@ -405,7 +407,7 @@ export function PaymentScreen({ payments = [], onSubmitPayment, submitting, user
                       activeOpacity={0.8}
                       disabled={imagePicking}
                     >
-                      <Text style={styles.browseIcon}>📷</Text>
+                      <Icon color={COLORS.purple} name="camera-outline" size={28} style={styles.browseIcon} />
                       <Text style={styles.browseBtnText}>Take Photo</Text>
                       <Text style={styles.browseBtnSub}>Capture paper receipt</Text>
                     </TouchableOpacity>
@@ -443,12 +445,11 @@ export function PaymentScreen({ payments = [], onSubmitPayment, submitting, user
       <Text style={styles.historySectionTitle}>Your Payment Submissions</Text>
 
       {payments.length === 0 ? (
-        <Card style={styles.emptyCard}>
-          <Text style={styles.emptyText}>No payments submitted yet.</Text>
-          <Text style={styles.emptySubText}>
-            After completing Step 1 and Step 2 above, your status will appear here.
-          </Text>
-        </Card>
+        <EmptyState
+          icon="receipt-outline"
+          message="After completing Step 1 and Step 2 above, your status will appear here."
+          title="No payments submitted yet"
+        />
       ) : (
         payments.map((p) => {
           const isVerified = p.status === "verified";
@@ -552,10 +553,10 @@ const styles = StyleSheet.create({
   planName: {
     fontSize: 17,
     fontWeight: "900",
-    color: COLORS.textLight
+    color: COLORS.onPrimary
   },
   pricePill: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.gold,
     paddingHorizontal: SPACING.md,
     paddingVertical: 4,
     borderRadius: RADIUS.full
@@ -563,11 +564,11 @@ const styles = StyleSheet.create({
   priceText: {
     fontSize: 15,
     fontWeight: "900",
-    color: COLORS.text
+    color: COLORS.onPrimary
   },
   planSubtitle: {
     fontSize: 13,
-    color: COLORS.textLight,
+    color: COLORS.onPrimary,
     opacity: 0.9,
     marginBottom: SPACING.md
   },
@@ -579,7 +580,7 @@ const styles = StyleSheet.create({
   },
   perkItem: {
     fontSize: 12,
-    color: COLORS.textLight,
+    color: COLORS.onPrimary,
     fontWeight: "600"
   },
   stepSection: {
@@ -592,7 +593,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs
   },
   stepBadge: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.gold,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
     borderRadius: RADIUS.sm
@@ -600,7 +601,7 @@ const styles = StyleSheet.create({
   stepBadgeText: {
     fontSize: 11,
     fontWeight: "900",
-    color: COLORS.text
+    color: COLORS.onPrimary
   },
   stepTitle: {
     fontSize: 16,
@@ -650,7 +651,7 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   categoryBadge: {
-    backgroundColor: "#f3f4f6",
+    backgroundColor: COLORS.surfaceMuted,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
     borderRadius: RADIUS.full
@@ -683,7 +684,7 @@ const styles = StyleSheet.create({
   accountAmount: {
     fontSize: 16,
     fontWeight: "900",
-    color: COLORS.accentDark || "#b45309"
+    color: COLORS.gold
   },
   methodSwitcher: {
     flexDirection: "row",
@@ -709,7 +710,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted
   },
   activeMethodTabText: {
-    color: COLORS.textLight
+    color: COLORS.onPrimary
   },
   formCard: {
     backgroundColor: COLORS.surface
@@ -769,29 +770,29 @@ const styles = StyleSheet.create({
     borderWidth: 1
   },
   statusVerified: {
-    backgroundColor: "#ecfdf5",
-    borderColor: "#10b981"
+    backgroundColor: COLORS.successBg,
+    borderColor: COLORS.success
   },
   statusRejected: {
-    backgroundColor: "#fef2f2",
-    borderColor: "#ef4444"
+    backgroundColor: COLORS.dangerBg,
+    borderColor: COLORS.danger
   },
   statusPending: {
-    backgroundColor: "#fffbeb",
-    borderColor: "#f59e0b"
+    backgroundColor: COLORS.warningBg,
+    borderColor: COLORS.warning
   },
   statusPillText: {
     fontSize: 11,
     fontWeight: "900"
   },
   textVerified: {
-    color: "#059669"
+    color: COLORS.success
   },
   textRejected: {
-    color: "#dc2626"
+    color: COLORS.danger
   },
   textPending: {
-    color: "#d97706"
+    color: COLORS.warning
   },
   statusBox: {
     padding: SPACING.sm,
@@ -799,19 +800,19 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm
   },
   statusBoxPending: {
-    backgroundColor: "#fffbeb",
+    backgroundColor: COLORS.warningBg,
     borderLeftWidth: 3,
-    borderLeftColor: "#f59e0b"
+    borderLeftColor: COLORS.warning
   },
   statusBoxVerified: {
-    backgroundColor: "#ecfdf5",
+    backgroundColor: COLORS.successBg,
     borderLeftWidth: 3,
-    borderLeftColor: "#10b981"
+    borderLeftColor: COLORS.success
   },
   statusBoxRejected: {
-    backgroundColor: "#fef2f2",
+    backgroundColor: COLORS.dangerBg,
     borderLeftWidth: 3,
-    borderLeftColor: "#ef4444"
+    borderLeftColor: COLORS.danger
   },
   statusBoxMessage: {
     fontSize: 12,
@@ -832,9 +833,9 @@ const styles = StyleSheet.create({
   },
   browseDeviceBtn: {
     flex: 1,
-    backgroundColor: "#eff6ff",
+    backgroundColor: COLORS.infoBg,
     borderWidth: 1.5,
-    borderColor: "#3b82f6",
+    borderColor: COLORS.info,
     borderStyle: "dashed",
     borderRadius: RADIUS.md,
     paddingVertical: SPACING.lg,
@@ -844,9 +845,9 @@ const styles = StyleSheet.create({
   },
   cameraDeviceBtn: {
     flex: 1,
-    backgroundColor: "#fdf4ff",
+    backgroundColor: COLORS.purpleBg,
     borderWidth: 1.5,
-    borderColor: "#a855f7",
+    borderColor: COLORS.purple,
     borderStyle: "dashed",
     borderRadius: RADIUS.md,
     paddingVertical: SPACING.lg,
@@ -880,7 +881,7 @@ const styles = StyleSheet.create({
   previewImage: {
     width: "100%",
     height: 180,
-    backgroundColor: "#f3f4f6"
+    backgroundColor: COLORS.surfaceMuted
   },
   previewMeta: {
     flexDirection: "row",
@@ -889,9 +890,9 @@ const styles = StyleSheet.create({
     padding: SPACING.sm
   },
   selectedBadge: {
-    backgroundColor: "#ecfdf5",
+    backgroundColor: COLORS.successBg,
     borderWidth: 1,
-    borderColor: "#10b981",
+    borderColor: COLORS.success,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
     borderRadius: RADIUS.full
@@ -899,7 +900,7 @@ const styles = StyleSheet.create({
   selectedBadgeText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#059669"
+    color: COLORS.success
   },
   removeImageBtn: {
     paddingVertical: 4,
@@ -908,6 +909,6 @@ const styles = StyleSheet.create({
   removeImageText: {
     fontSize: 12,
     fontWeight: "700",
-    color: COLORS.error || "#ef4444"
+    color: COLORS.danger
   }
 });

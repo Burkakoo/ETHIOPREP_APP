@@ -4,12 +4,19 @@
     "slug": "ethioprep",
     "version": "0.1.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
-    "splash": { "backgroundColor": "#0d7c66" },
-    "android": { "package": "com.ethioprep.mobile" },
-    "ios": { "bundleIdentifier": "com.ethioprep.mobile" },
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0e1117"
+    },
+    "android": {
+      "package": "com.ethioprep.mobile"
+    },
+    "ios": {
+      "bundleIdentifier": "com.ethioprep.mobile"
+    },
     "plugins": [
-      "expo-asset"
+      "expo-asset",
+      "expo-font"
     ]
   }
 }
