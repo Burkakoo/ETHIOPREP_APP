@@ -4,6 +4,7 @@ import { Button } from "../components/Button.js";
 import { Input } from "../components/Input.js";
 import { Notice } from "../components/Notice.js";
 import { login, register } from "../services/api.js";
+import { Icon } from "../components/Icon.js";
 import { COLORS, RADIUS, SPACING } from "../utils/theme.js";
 
 export function AuthScreen({ onLoginSuccess }) {
@@ -78,7 +79,7 @@ export function AuthScreen({ onLoginSuccess }) {
                     stream === "natural" && styles.streamOptionTextActive
                   ]}
                 >
-                  🔬 Natural Science
+                  <Icon color={stream === "natural" ? COLORS.primary : COLORS.textMuted} name="flask-outline" size={15} />{"  "}Natural Science
                 </Text>
               </TouchableOpacity>
 
@@ -95,7 +96,7 @@ export function AuthScreen({ onLoginSuccess }) {
                     stream === "social" && styles.streamOptionTextActive
                   ]}
                 >
-                  📚 Social Science
+                  <Icon color={stream === "social" ? COLORS.primary : COLORS.textMuted} name="library-outline" size={15} />{"  "}Social Science
                 </Text>
               </TouchableOpacity>
             </View>
@@ -210,7 +211,7 @@ const styles = StyleSheet.create({
   },
   streamOptionActive: {
     borderColor: COLORS.primary,
-    backgroundColor: "#f0fdf4"
+    backgroundColor: COLORS.primaryBg
   },
   streamOptionText: {
     fontSize: 12,

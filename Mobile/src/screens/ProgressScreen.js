@@ -6,6 +6,8 @@ import { Card } from "../components/Card.js";
 import { Input } from "../components/Input.js";
 import { Notice } from "../components/Notice.js";
 import { request } from "../services/api.js";
+import { Icon } from "../components/Icon.js";
+import { EmptyState } from "../components/EmptyState.js";
 import { COLORS, RADIUS, SPACING } from "../utils/theme.js";
 
 const FAVORITES_KEY = "ethioprep_favorite_questions";
@@ -135,7 +137,8 @@ export function ProgressScreen({ progress = [], onSaveProgress, saving }) {
           style={[styles.subTabItem, activeSubTab === "leaderboard" && styles.activeSubTabItem]}
         >
           <Text style={[styles.subTabText, activeSubTab === "leaderboard" && styles.activeSubTabText]}>
-            Leaderboard 🏆
+            <Icon color={activeSubTab === "leaderboard" ? COLORS.onPrimary : COLORS.gold} name="trophy-outline" size={13} />{" "}
+            Leaderboard
           </Text>
         </TouchableOpacity>
 
@@ -172,7 +175,7 @@ export function ProgressScreen({ progress = [], onSaveProgress, saving }) {
               <Text style={styles.metricLbl}>Items Mastered</Text>
             </Card>
             <Card style={styles.metricCard}>
-              <Text style={[styles.metricVal, { color: COLORS.accent }]}>#{userRank}</Text>
+              <Text style={[styles.metricVal, { color: COLORS.gold }]}>#{userRank}</Text>
               <Text style={styles.metricLbl}>Your Rank</Text>
             </Card>
           </View>
@@ -219,11 +222,11 @@ export function ProgressScreen({ progress = [], onSaveProgress, saving }) {
           )}
 
           {progress.length === 0 ? (
-            <Card>
-              <Text style={styles.emptyText}>
-                No progress logged yet. Solve subject quizzes or complete timed exams to build your history!
-              </Text>
-            </Card>
+            <EmptyState
+              icon="stats-chart-outline"
+              message="Solve subject quizzes or complete timed exams to build your history!"
+              title="No progress logged yet"
+            />
           ) : (
             progress.map((item) => (
               <Card key={item._id || item.contentId} style={styles.logCard}>
@@ -291,10 +294,10 @@ export function ProgressScreen({ progress = [], onSaveProgress, saving }) {
                     <Text
                       style={[
                         styles.rankCircleText,
-                        isTop3 && { color: COLORS.textLight, fontWeight: "900" }
+                        isTop3 && { color: COLORS.onPrimary, fontWeight: "900" }
                       ]}
                     >
-                      {student.rank === 1 ? "🥇" : student.rank === 2 ? "🥈" : student.rank === 3 ? "🥉" : student.rank}
+                      {isTop3 ? <Icon color={COLORS.onPrimary} name="medal" size={16} /> : student.rank}
                     </Text>
                   </View>
 
@@ -325,12 +328,11 @@ export function ProgressScreen({ progress = [], onSaveProgress, saving }) {
           </Text>
 
           {favoritesList.length === 0 ? (
-            <Card style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No favorite questions saved yet.</Text>
-              <Text style={styles.emptySubText}>
-                During any timed mock exam, tap "☆ Save Favorite" to review challenging questions here later!
-              </Text>
-            </Card>
+            <EmptyState
+              icon="star-outline"
+              message={'During any timed mock exam, tap "Save Favorite" to review challenging questions here later!'}
+              title="No favorite questions saved yet"
+            />
           ) : (
             favoritesList.map((q, idx) => (
               <Card key={q._id || idx} style={styles.favCard}>
@@ -342,7 +344,8 @@ export function ProgressScreen({ progress = [], onSaveProgress, saving }) {
                     onPress={() => removeFavorite(q._id)}
                     style={styles.removeFavBtn}
                   >
-                    <Text style={styles.removeFavText}>Remove ✕</Text>
+                    <Icon color={COLORS.danger} name="close" size={13} />
+                    <Text style={styles.removeFavText}>Remove</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -402,7 +405,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted
   },
   activeSubTabText: {
-    color: COLORS.textLight
+    color: COLORS.onPrimary
   },
   title: {
     fontSize: 20,
@@ -528,7 +531,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs
   },
   userRankBadge: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.gold,
     paddingHorizontal: SPACING.md,
     paddingVertical: 4,
     borderRadius: RADIUS.full
@@ -536,18 +539,18 @@ const styles = StyleSheet.create({
   userRankNum: {
     fontSize: 16,
     fontWeight: "900",
-    color: COLORS.text
+    color: COLORS.onPrimary
   },
   userRankSub: {
     fontSize: 12,
-    color: COLORS.textLight,
+    color: COLORS.onPrimary,
     flex: 1
   },
   leaderCard: {
     marginBottom: SPACING.xs
   },
   topLeaderCard: {
-    borderColor: "#fde68a"
+    borderColor: COLORS.warning
   },
   leaderRow: {
     flexDirection: "row",
@@ -558,13 +561,13 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: COLORS.surfaceMuted,
     alignItems: "center",
     justifyContent: "center"
   },
-  rank1: { backgroundColor: "#f59e0b" },
-  rank2: { backgroundColor: "#9ca3af" },
-  rank3: { backgroundColor: "#b45309" },
+  rank1: { backgroundColor: COLORS.gold },
+  rank2: { backgroundColor: COLORS.silver },
+  rank3: { backgroundColor: COLORS.bronze },
   rankCircleText: {
     fontSize: 13,
     fontWeight: "800",
@@ -606,7 +609,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm
   },
   favBadge: {
-    backgroundColor: "#fef3c7",
+    backgroundColor: COLORS.warningBg,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
     borderRadius: RADIUS.sm
@@ -614,9 +617,13 @@ const styles = StyleSheet.create({
   favBadgeText: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#b45309"
+    color: COLORS.warning
   },
   removeFavBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    minHeight: 32,
     paddingVertical: 2,
     paddingHorizontal: SPACING.xs
   },

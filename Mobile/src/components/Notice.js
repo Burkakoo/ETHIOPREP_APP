@@ -1,70 +1,46 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { Icon } from "./Icon.js";
 import { COLORS, RADIUS, SPACING } from "../utils/theme.js";
+
+const TYPES = {
+  success: { fg: COLORS.success, bg: COLORS.successBg, icon: "checkmark-circle" },
+  error: { fg: COLORS.danger, bg: COLORS.dangerBg, icon: "alert-circle" },
+  warning: { fg: COLORS.warning, bg: COLORS.warningBg, icon: "warning" },
+  info: { fg: COLORS.info, bg: COLORS.infoBg, icon: "information-circle" }
+};
 
 export function Notice({ type = "info", message }) {
   if (!message) return null;
-
-  const isSuccess = type === "success";
-  const isError = type === "error";
-  const isWarning = type === "warning";
+  const t = TYPES[type] || TYPES.info;
 
   return (
     <View
-      style={[
-        styles.container,
-        isSuccess && styles.success,
-        isError && styles.error,
-        isWarning && styles.warning
-      ]}
+      accessibilityLiveRegion="polite"
+      accessibilityRole="alert"
+      style={[styles.container, { backgroundColor: t.bg, borderColor: t.fg }]}
     >
-      <Text
-        style={[
-          styles.text,
-          isSuccess && styles.successText,
-          isError && styles.errorText,
-          isWarning && styles.warningText
-        ]}
-      >
-        {message}
-      </Text>
+      <Icon color={t.fg} name={t.icon} size={18} />
+      <Text style={[styles.text, { color: t.fg }]}>{message}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: SPACING.sm,
     padding: SPACING.md,
     borderRadius: RADIUS.md,
     marginBottom: SPACING.md,
-    backgroundColor: COLORS.infoBg,
     borderWidth: 1,
-    borderColor: COLORS.info
-  },
-  success: {
-    backgroundColor: COLORS.successBg,
-    borderColor: COLORS.success
-  },
-  error: {
-    backgroundColor: COLORS.dangerBg,
-    borderColor: COLORS.danger
-  },
-  warning: {
-    backgroundColor: COLORS.warningBg,
-    borderColor: COLORS.warning
+    borderLeftWidth: 4
   },
   text: {
+    flex: 1,
     fontSize: 13,
     fontWeight: "600",
-    color: COLORS.info
-  },
-  successText: {
-    color: COLORS.success
-  },
-  errorText: {
-    color: COLORS.danger
-  },
-  warningText: {
-    color: COLORS.warning
+    lineHeight: 18
   }
 });

@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Card } from "../components/Card.js";
+import { Icon } from "../components/Icon.js";
+import { EmptyState } from "../components/EmptyState.js";
 import { COLORS, RADIUS, SPACING } from "../utils/theme.js";
 
 export function HomeScreen({ user, subjects = [], onSelectSubject, onNavigateTab }) {
@@ -31,7 +33,8 @@ export function HomeScreen({ user, subjects = [], onSelectSubject, onNavigateTab
           <Text style={styles.greeting}>Welcome, {user?.displayName?.split(" ")[0]}!</Text>
           <View style={styles.streamBadge}>
             <Text style={styles.streamBadgeText}>
-              {isNatural ? "🔬 Natural Science" : "📚 Social Science"}
+              <Icon color={COLORS.onPrimary} name={isNatural ? "flask-outline" : "library-outline"} size={12} />{" "}
+              {isNatural ? "Natural Science" : "Social Science"}
             </Text>
           </View>
         </View>
@@ -59,7 +62,8 @@ export function HomeScreen({ user, subjects = [], onSelectSubject, onNavigateTab
       {/* Locked stream indicator banner */}
       <View style={styles.streamInfoBanner}>
         <Text style={styles.streamInfoTitle}>
-          {isNatural ? "🔬 Natural Science Stream" : "📚 Social Science Stream"}
+          <Icon color={COLORS.primary} name={isNatural ? "flask-outline" : "library-outline"} size={15} />{"  "}
+          {isNatural ? "Natural Science Stream" : "Social Science Stream"}
         </Text>
         <Text style={styles.streamInfoDesc}>
           {isNatural
@@ -73,9 +77,7 @@ export function HomeScreen({ user, subjects = [], onSelectSubject, onNavigateTab
       </Text>
 
       {filteredSubjects.length === 0 ? (
-        <Card>
-          <Text style={styles.emptyText}>No subjects found for this category.</Text>
-        </Card>
+        <EmptyState icon="library-outline" message="No subjects found for this category." title="No subjects yet" />
       ) : (
         filteredSubjects.map((subject) => (
           <TouchableOpacity
@@ -115,7 +117,7 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 22,
     fontWeight: "800",
-    color: COLORS.textLight
+    color: COLORS.onPrimary
   },
   heroSubtitle: {
     fontSize: 13,
@@ -138,7 +140,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 16,
     fontWeight: "800",
-    color: COLORS.accent
+    color: COLORS.onPrimary
   },
   statLabel: {
     fontSize: 11,
@@ -232,7 +234,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full
   },
   streamBadgeText: {
-    color: COLORS.textLight,
+    color: COLORS.onPrimary,
     fontSize: 11,
     fontWeight: "800"
   },
