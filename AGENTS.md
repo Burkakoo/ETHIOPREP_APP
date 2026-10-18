@@ -290,6 +290,53 @@ The following page components remain in main.jsx and should be extracted:
 - Implement token rotation in mobile app
 - Add offline queue retry logic improvements
 
+#### Known Issues
+
+**Metro Bundler Startup Issue** (Investigated 2026-10-18):
+- Symptom: Metro bundler hangs during startup at "Waiting on http://localhost:8081"
+- Root Cause: Likely React 19 compatibility issue with Expo 57
+- Current Stack:
+  - React: 19.2.3
+  - React Native: 0.86.3 (requires React 19)
+  - Expo: ~57.0.30
+- Attempts to Fix:
+  - ✅ Created babel.config.js with babel-preset-expo preset
+  - ✅ Created metro.config.js with Expo defaults
+  - ✅ Installed babel-preset-expo package
+  - ❌ Removed config files (Expo 57 may use internal config)
+  - ❌ Started with --clear flag (no improvement)
+  - ❌ Tried --tunnel flag (requires ngrok, unrelated issue)
+- Workaround Options:
+  1. Use Expo Go app on physical device (bypasses bundler issues)
+  2. Downgrade to Expo 52 (requires React 18, React Native 0.76)
+  3. Wait for Expo 58+ with better React 19 support
+  4. Use EAS Build for production builds
+- Current Status: Development environment has bundler issues; app code is valid
+
+**Security Vulnerabilities** (22 total - 7 moderate, 15 high):
+- Located in Expo build tooling transitive dependencies:
+  - braces (DoS via stack exhaustion)
+  - node-forge (RSA signature verification)
+  - uuid (buffer bounds check)
+  - xml2js (prototype pollution)
+  - semver (ReDoS)
+  - @xmldom/xmldom (XML injection - multiple CVEs)
+  - fast-xml-parser (XML injection)
+  - image-size (DoS via infinite loops)
+  - lodash.pick (prototype pollution)
+  - node-fetch (header forwarding)
+  - sprintf-js (DoS via precision specifiers)
+- Fix Attempts:
+  - ✅ Tried `npm audit fix --force` - downgraded to Expo 44.0.6 (breaking change)
+  - ❌ Downgrade increased vulnerabilities from 22 to 44 (introduced critical @xmldom issues)
+  - ✅ Restored to original versions
+- Current Recommendation:
+  - Leave as-is for development
+  - Vulnerabilities are in build/dev tools, not app runtime
+  - Monitor Expo release notes for security updates
+  - When Expo releases compatible version with fixes, upgrade
+  - For production: Use EAS Build which may use different dependency tree
+
 ### Database
 - Consider standardizing soft deletion to `deletedAt` pattern (requires migration)
 - Add database cleanup jobs for expired tokens

@@ -76,7 +76,6 @@ userSchema.set("toJSON", {
   }
 });
 
-userSchema.index({ email: 1 });
 userSchema.index({ status: 1 });
 userSchema.index({ role: 1, status: 1 });
 userSchema.index({ stream: 1, status: 1 });
