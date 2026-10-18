@@ -37,7 +37,7 @@ import {
   ZapIcon
 } from "lucide-react";
 import { apiRequest, clearSession, saveSession } from "./services/api.js";
-import { roleBadge, statusBadge } from "./components/Badge.jsx";
+import { ROLE_LABELS, roleBadge, statusBadge } from "./components/Badge.jsx";
 import { SkeletonStats, SkeletonTable } from "./components/Spinner.jsx";
 import { Notice } from "./components/Notice.jsx";
 import { fmtDate, getGreeting } from "./utils/helpers.js";
