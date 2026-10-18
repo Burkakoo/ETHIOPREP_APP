@@ -4,6 +4,8 @@ import { Button } from "../components/Button.js";
 import { Card } from "../components/Card.js";
 import { Input } from "../components/Input.js";
 import { Notice } from "../components/Notice.js";
+import { Icon } from "../components/Icon.js";
+import { EmptyState } from "../components/EmptyState.js";
 import { COLORS, RADIUS, SPACING } from "../utils/theme.js";
 
 export function NotesScreen({ notes = [], onSaveNote, saving, user }) {
@@ -84,7 +86,8 @@ export function NotesScreen({ notes = [], onSaveNote, saving, user }) {
           style={[styles.tabBtn, activeTab === "materials" && styles.activeTabBtn]}
         >
           <Text style={[styles.tabBtnText, activeTab === "materials" && styles.activeTabBtnText]}>
-            📖 Official Materials ({materials.length})
+            <Icon color={activeTab === "materials" ? COLORS.onPrimary : COLORS.textMuted} name="book-outline" size={14} />{" "}
+            Official Materials ({materials.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -92,18 +95,19 @@ export function NotesScreen({ notes = [], onSaveNote, saving, user }) {
           style={[styles.tabBtn, activeTab === "personal" && styles.activeTabBtn]}
         >
           <Text style={[styles.tabBtnText, activeTab === "personal" && styles.activeTabBtnText]}>
-            📝 My Notebook ({personal.length})
+            <Icon color={activeTab === "personal" ? COLORS.onPrimary : COLORS.textMuted} name="create-outline" size={14} />{" "}
+            My Notebook ({personal.length})
           </Text>
         </TouchableOpacity>
       </View>
 
       {activeTab === "materials" ? (
         materials.length === 0 ? (
-          <Card>
-            <Text style={styles.emptyText}>
-              No official study materials uploaded yet. Teachers are uploading PDF and presentation handouts.
-            </Text>
-          </Card>
+          <EmptyState
+            icon="document-attach-outline"
+            message="Teachers are uploading PDF and presentation handouts."
+            title="No official materials yet"
+          />
         ) : (
           materials.map((m) => {
             const fileType = (m.fileType || "pdf").toUpperCase();
@@ -121,7 +125,8 @@ export function NotesScreen({ notes = [], onSaveNote, saving, user }) {
                 {m.body ? <Text style={styles.noteBody}>{m.body}</Text> : null}
                 {m.fileUrl ? (
                   <View style={styles.downloadRow}>
-                    <Text style={styles.downloadLinkText}>📥 Available for offline study ({fileType})</Text>
+                    <Text style={styles.downloadLinkText}><Icon color={COLORS.primary} name="cloud-download-outline" size={14} />{" "}
+                      Available for offline study ({fileType})</Text>
                   </View>
                 ) : null}
               </Card>
@@ -155,11 +160,11 @@ export function NotesScreen({ notes = [], onSaveNote, saving, user }) {
           )}
 
           {personal.length === 0 ? (
-            <Card>
-              <Text style={styles.emptyText}>
-                Your notebook is empty. Tap "+ New Note" to write down important formulas and exam summaries.
-              </Text>
-            </Card>
+            <EmptyState
+              icon="create-outline"
+              message={'Tap "+ New Note" to write down important formulas and exam summaries.'}
+              title="Your notebook is empty"
+            />
           ) : (
             personal.map((note) => (
               <Card key={note._id || note.localId} style={styles.noteCard}>
@@ -225,7 +230,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted
   },
   activeTabBtnText: {
-    color: COLORS.textLight
+    color: COLORS.onPrimary
   },
   formCard: {
     marginBottom: SPACING.lg,
@@ -253,7 +258,7 @@ const styles = StyleSheet.create({
     marginBottom: 4
   },
   formatBadge: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.gold,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: RADIUS.sm
@@ -261,7 +266,7 @@ const styles = StyleSheet.create({
   formatBadgeText: {
     fontSize: 10,
     fontWeight: "800",
-    color: COLORS.primaryDark
+    color: COLORS.onPrimary
   },
   subjectText: {
     fontSize: 12,

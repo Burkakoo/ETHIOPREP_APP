@@ -11,6 +11,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Header } from "./src/components/Header.js";
+import { SkeletonCard } from "./src/components/Skeleton.js";
 import { Icon } from "./src/components/Icon.js";
 import { Notice } from "./src/components/Notice.js";
 import { AuthScreen } from "./src/screens/AuthScreen.js";
@@ -61,6 +62,7 @@ function MainDashboard({ user, onLogout }) {
   const [savingNote, setSavingNote] = useState(false);
   const [savingProgress, setSavingProgress] = useState(false);
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
 
   useEffect(() => {
     loadDashboardData();
@@ -93,6 +95,8 @@ function MainDashboard({ user, onLogout }) {
       if (payRes.status === "fulfilled") setPayments(payRes.value.payments || []);
     } catch (error) {
       setNotice({ type: "error", message: "Failed to sync remote data. Offline cache active." });
+    } finally {
+      setDashboardLoading(false);
     }
   }
 
@@ -264,7 +268,15 @@ function MainDashboard({ user, onLogout }) {
               })}
             </View>
 
-            {tab === "home" && (
+            {dashboardLoading && tab !== "profile" && (
+              <View accessibilityLabel="Loading content">
+                <SkeletonCard lines={2} />
+                <SkeletonCard lines={3} />
+                <SkeletonCard lines={2} />
+              </View>
+            )}
+
+            {!dashboardLoading && tab === "home" && (
               <HomeScreen
                 onNavigateTab={setTab}
                 onSelectSubject={(subject) => {
@@ -282,7 +294,7 @@ function MainDashboard({ user, onLogout }) {
               />
             )}
 
-            {tab === "exams" && (
+            {!dashboardLoading && tab === "exams" && (
               <ExamsScreen
                 exams={exams}
                 loadingExamId={loadingExamId}
@@ -291,7 +303,7 @@ function MainDashboard({ user, onLogout }) {
               />
             )}
 
-            {tab === "notes" && (
+            {!dashboardLoading && tab === "notes" && (
               <NotesScreen
                 notes={notes}
                 onSaveNote={handleSaveNote}
@@ -300,7 +312,7 @@ function MainDashboard({ user, onLogout }) {
               />
             )}
 
-            {tab === "progress" && (
+            {!dashboardLoading && tab === "progress" && (
               <ProgressScreen
                 onSaveProgress={handleSaveProgress}
                 progress={progress}
@@ -308,7 +320,7 @@ function MainDashboard({ user, onLogout }) {
               />
             )}
 
-            {tab === "payments" && (
+            {!dashboardLoading && tab === "payments" && (
               <PaymentScreen
                 onSubmitPayment={handleSubmitPayment}
                 payments={payments}

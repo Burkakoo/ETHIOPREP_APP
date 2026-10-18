@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Button } from "../components/Button.js";
 import { Card } from "../components/Card.js";
 import { request } from "../services/api.js";
+import { Icon } from "../components/Icon.js";
 import { COLORS, RADIUS, SPACING } from "../utils/theme.js";
 
 const FAVORITES_KEY = "ethioprep_favorite_questions";
@@ -112,7 +113,8 @@ export function ExamActiveScreen({ examData, onSubmit, onExit, submitting }) {
     <View style={styles.container}>
       <View style={styles.topBar}>
         <TouchableOpacity onPress={onExit} style={styles.exitBtn}>
-          <Text style={styles.exitText}>✕ Exit Exam</Text>
+          <Icon color={COLORS.danger} name="close" size={16} />
+          <Text style={styles.exitText}>Exit Exam</Text>
         </TouchableOpacity>
         <Text style={styles.progressCounter}>
           {answeredCount}/{questions.length} Answered
@@ -197,8 +199,9 @@ export function ExamActiveScreen({ examData, onSubmit, onExit, submitting }) {
                 onPress={() => toggleFavorite(question)}
                 style={[styles.favBtn, isFav && styles.favBtnActive]}
               >
+                <Icon color={COLORS.gold} name={isFav ? "star" : "star-outline"} size={14} />
                 <Text style={[styles.favBtnText, isFav && styles.favBtnTextActive]}>
-                  {isFav ? "★ Saved" : "☆ Save Favorite"}
+                  {isFav ? "Saved" : "Save Favorite"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -210,13 +213,18 @@ export function ExamActiveScreen({ examData, onSubmit, onExit, submitting }) {
                   question.isCorrect ? styles.statusCorrect : styles.statusIncorrect
                 ]}
               >
+                <Icon
+                  color={question.isCorrect ? COLORS.success : COLORS.danger}
+                  name={question.isCorrect ? "checkmark-circle" : "close-circle"}
+                  size={15}
+                />
                 <Text
                   style={[
                     styles.statusTagText,
                     question.isCorrect ? styles.textSuccess : styles.textDanger
                   ]}
                 >
-                  {question.isCorrect ? "✓ Correct" : "✗ Mistake / Incorrect"}
+                  {question.isCorrect ? "Correct" : "Mistake / Incorrect"}
                 </Text>
               </View>
             )}
@@ -313,7 +321,13 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm
   },
   exitBtn: {
-    paddingVertical: SPACING.xs
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    minHeight: 36,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.dangerBg
   },
   exitText: {
     color: COLORS.danger,
@@ -384,7 +398,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2
   },
   qNumText: {
-    color: COLORS.textLight,
+    color: COLORS.onPrimary,
     fontWeight: "800",
     fontSize: 11
   },
@@ -479,7 +493,11 @@ const styles = StyleSheet.create({
     gap: SPACING.sm
   },
   favBtn: {
-    paddingHorizontal: SPACING.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    minHeight: 32,
+    paddingHorizontal: SPACING.sm + 2,
     paddingVertical: 3,
     borderRadius: RADIUS.full,
     borderWidth: 1,
@@ -487,8 +505,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface
   },
   favBtnActive: {
-    backgroundColor: "#fef3c7",
-    borderColor: "#f59e0b"
+    backgroundColor: COLORS.warningBg,
+    borderColor: COLORS.warning
   },
   favBtnText: {
     fontSize: 11,
@@ -496,9 +514,12 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted
   },
   favBtnTextActive: {
-    color: "#b45309"
+    color: COLORS.warning
   },
   statusTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 3,
     borderRadius: RADIUS.sm,
@@ -506,42 +527,42 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm
   },
   statusCorrect: {
-    backgroundColor: "#ecfdf5"
+    backgroundColor: COLORS.successBg
   },
   statusIncorrect: {
-    backgroundColor: "#fef2f2"
+    backgroundColor: COLORS.dangerBg
   },
   statusTagText: {
     fontSize: 12,
     fontWeight: "800"
   },
   textSuccess: {
-    color: "#059669"
+    color: COLORS.success
   },
   textDanger: {
-    color: "#dc2626"
+    color: COLORS.danger
   },
   correctOptionRow: {
-    borderColor: "#10b981",
-    backgroundColor: "#ecfdf5"
+    borderColor: COLORS.success,
+    backgroundColor: COLORS.successBg
   },
   incorrectOptionRow: {
-    borderColor: "#ef4444",
-    backgroundColor: "#fef2f2"
+    borderColor: COLORS.danger,
+    backgroundColor: COLORS.dangerBg
   },
   radioCorrect: {
-    borderColor: "#10b981",
-    backgroundColor: "#10b981"
+    borderColor: COLORS.success,
+    backgroundColor: COLORS.success
   },
   radioMistake: {
-    borderColor: "#ef4444",
-    backgroundColor: "#ef4444"
+    borderColor: COLORS.danger,
+    backgroundColor: COLORS.danger
   },
   labelCorrect: {
-    color: "#059669"
+    color: COLORS.success
   },
   textCorrectAnswer: {
-    color: "#065f46",
+    color: COLORS.success,
     fontWeight: "700"
   },
   reviewFilterRow: {
@@ -569,7 +590,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted
   },
   activeReviewFilterText: {
-    color: COLORS.textLight
+    color: COLORS.onPrimary
   }
 });
 
