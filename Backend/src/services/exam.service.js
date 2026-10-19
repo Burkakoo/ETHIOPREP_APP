@@ -64,7 +64,13 @@ export async function startExamAttempt(examId, user) {
     return {
       _id: q._id,
       prompt: q.prompt,
-      options,
+      options: options.map((option) => ({
+        ...option,
+        imageUrl: option.imageUrl || q.optionImages?.[option.key] || undefined
+      })),
+      imageUrl: q.imageUrl,
+      explanation: q.explanation,
+      explanationImageUrl: q.explanationImageUrl,
       difficulty: q.difficulty,
       subjectId: q.subjectId,
       chapterId: q.chapterId

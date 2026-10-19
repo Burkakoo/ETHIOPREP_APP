@@ -90,7 +90,7 @@ export function PaymentScreen({ payments = [], onSubmitPayment, submitting, user
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions?.Images || "images",
+        mediaTypes: ["images"],
         allowsEditing: true,
         quality: 0.7,
         base64: true

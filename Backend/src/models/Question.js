@@ -29,11 +29,25 @@ const questionSchema = new mongoose.Schema(
       trim: true,
       maxlength: 5000
     },
+    imageUrl: {
+      type: String,
+      trim: true,
+      maxlength: 8000000
+    },
     options: [{
       type: String,
       trim: true,
       maxlength: 1000
     }],
+    optionImages: {
+      type: Map,
+      of: {
+        type: String,
+        trim: true,
+        maxlength: 8000000
+      },
+      default: {}
+    },
     correctAnswer: {
       type: String,
       trim: true,
@@ -43,6 +57,11 @@ const questionSchema = new mongoose.Schema(
       type: String,
       trim: true,
       maxlength: 3000
+    },
+    explanationImageUrl: {
+      type: String,
+      trim: true,
+      maxlength: 8000000
     },
     tags: [{
       type: String,

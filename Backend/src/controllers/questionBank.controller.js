@@ -4,7 +4,8 @@ import { Subject } from "../models/Subject.js";
 
 export async function getSubjects(request, response) {
   try {
-    const filter = { isActive: true };
+    const canManage = ["admin", "content_manager"].includes(request.user?.role);
+    const filter = request.query.includeInactive === "true" && canManage ? {} : { isActive: true };
     if (request.query.stream && ["natural", "social"].includes(request.query.stream)) {
       filter.$or = [{ stream: request.query.stream }, { stream: "both" }];
     }
@@ -13,6 +14,28 @@ export async function getSubjects(request, response) {
   } catch (error) {
     console.error(error);
     return response.status(500).json({ error: "Failed to fetch subjects." });
+  }
+}
+
+export async function updateSubject(request, response) {
+  try {
+    const { name, code, description, gradeLevel, stream } = request.body;
+    const updates = {};
+    if (name !== undefined) updates.name = String(name).trim();
+    if (code !== undefined) updates.code = String(code).trim().toUpperCase();
+    if (description !== undefined) updates.description = description;
+    if (gradeLevel !== undefined) updates.gradeLevel = gradeLevel;
+    if (stream !== undefined) updates.stream = stream;
+    if (updates.code) {
+      const duplicate = await Subject.exists({ code: updates.code, _id: { $ne: request.params.subjectId } });
+      if (duplicate) return response.status(409).json({ error: "A subject with that code already exists." });
+    }
+    const subject = await Subject.findByIdAndUpdate(request.params.subjectId, updates, { new: true, runValidators: true });
+    if (!subject) return response.status(404).json({ error: "Subject not found." });
+    return response.json({ subject });
+  } catch (error) {
+    console.error(error);
+    return response.status(500).json({ error: "Failed to update subject." });
   }
 }
 
@@ -35,7 +58,7 @@ export async function createSubject(request, response) {
       name: String(name).trim(),
       code: normalizedCode,
       description,
-      gradeLevel,
+      gradeLevel: gradeLevel || undefined,
       stream: ["natural", "social", "both"].includes(stream) ? stream : "both",
       isActive: true
     });
@@ -67,14 +90,44 @@ export async function deactivateSubject(request, response) {
   }
 }
 
+export async function reactivateSubject(request, response) {
+  try {
+    const subject = await Subject.findByIdAndUpdate(request.params.subjectId, { isActive: true }, { new: true, runValidators: true });
+    if (!subject) return response.status(404).json({ error: "Subject not found." });
+    return response.json({ subject });
+  } catch (error) {
+    console.error(error);
+    return response.status(500).json({ error: "Failed to reactivate subject." });
+  }
+}
+
 export async function getChaptersBySubject(request, response) {
   try {
     const { subjectId } = request.params;
-    const chapters = await Chapter.find({ subjectId, isActive: true }).sort({ order: 1, title: 1 });
+    const canManage = ["admin", "content_manager"].includes(request.user?.role);
+    const filter = { subjectId };
+    if (!(request.query.includeInactive === "true" && canManage)) filter.isActive = true;
+    const chapters = await Chapter.find(filter).sort({ order: 1, title: 1 });
     return response.json({ chapters });
   } catch (error) {
     console.error(error);
     return response.status(500).json({ error: "Failed to fetch chapters." });
+  }
+}
+
+export async function updateChapter(request, response) {
+  try {
+    const { title, description, order } = request.body;
+    const updates = {};
+    if (title !== undefined) updates.title = String(title).trim();
+    if (description !== undefined) updates.description = description;
+    if (order !== undefined) updates.order = Number(order);
+    const chapter = await Chapter.findByIdAndUpdate(request.params.chapterId, updates, { new: true, runValidators: true });
+    if (!chapter) return response.status(404).json({ error: "Chapter not found." });
+    return response.json({ chapter });
+  } catch (error) {
+    console.error(error);
+    return response.status(500).json({ error: "Failed to update chapter." });
   }
 }
 
@@ -125,10 +178,26 @@ export async function deactivateChapter(request, response) {
   }
 }
 
+export async function reactivateChapter(request, response) {
+  try {
+    const chapter = await Chapter.findById(request.params.chapterId);
+    if (!chapter) return response.status(404).json({ error: "Chapter not found." });
+    const subject = await Subject.exists({ _id: chapter.subjectId, isActive: true });
+    if (!subject) return response.status(400).json({ error: "Reactivate the subject before this chapter." });
+    chapter.isActive = true;
+    await chapter.save();
+    return response.json({ chapter });
+  } catch (error) {
+    console.error(error);
+    return response.status(500).json({ error: "Failed to reactivate chapter." });
+  }
+}
+
 export async function getQuestions(request, response) {
   try {
     const { subjectId, chapterId } = request.query;
-    const filter = { isActive: true };
+    const canManage = ["admin", "content_manager"].includes(request.user?.role);
+    const filter = request.query.includeInactive === "true" && canManage ? {} : { isActive: true };
 
     if (subjectId) filter.subjectId = subjectId;
     if (chapterId) filter.chapterId = chapterId;
@@ -146,9 +215,40 @@ export async function getQuestions(request, response) {
   }
 }
 
+export async function updateQuestion(request, response) {
+  try {
+    const { subjectId, chapterId, prompt, imageUrl, options, optionImages, correctAnswer, explanation, explanationImageUrl, difficulty, questionType, tags } = request.body;
+    const existing = await Question.findById(request.params.questionId);
+    if (!existing) return response.status(404).json({ error: "Question not found." });
+    const nextSubjectId = subjectId || String(existing.subjectId);
+    const subject = await Subject.findOne({ _id: nextSubjectId, isActive: true });
+    if (!subject) return response.status(400).json({ error: "An active subject is required." });
+    if (chapterId) {
+      const chapter = await Chapter.findOne({ _id: chapterId, subjectId: nextSubjectId, isActive: true });
+      if (!chapter) return response.status(400).json({ error: "Chapter must belong to the active subject." });
+    }
+    const nextType = questionType || existing.questionType;
+    const normalizedOptions = options === undefined ? existing.options : (Array.isArray(options) ? options.map((option) => String(option).trim()).filter(Boolean) : []);
+    if (nextType === "multiple_choice" && normalizedOptions.length < 2) return response.status(400).json({ error: "Multiple-choice questions require at least two options." });
+    const updates = { subjectId: nextSubjectId, chapterId: chapterId || undefined, questionType: nextType, options: normalizedOptions };
+    for (const [key, value] of Object.entries({ prompt, imageUrl, optionImages, correctAnswer, explanation, explanationImageUrl, difficulty, tags })) {
+      if (value !== undefined) {
+        updates[key] = key === "tags"
+          ? (Array.isArray(value) ? value.map((tag) => String(tag).trim().toLowerCase()) : [])
+          : value;
+      }
+    }
+    const question = await Question.findByIdAndUpdate(request.params.questionId, updates, { new: true, runValidators: true });
+    return response.json({ question });
+  } catch (error) {
+    console.error(error);
+    return response.status(500).json({ error: "Failed to update question." });
+  }
+}
+
 export async function createQuestion(request, response) {
   try {
-    const { subjectId, chapterId, prompt, options, correctAnswer, explanation, difficulty, questionType, tags } = request.body;
+    const { subjectId, chapterId, prompt, imageUrl, options, optionImages, correctAnswer, explanation, explanationImageUrl, difficulty, questionType, tags } = request.body;
 
     if (!subjectId || !prompt || !correctAnswer) {
       return response.status(400).json({ error: "Subject ID, prompt, and correctAnswer are required." });
@@ -178,9 +278,12 @@ export async function createQuestion(request, response) {
       subjectId,
       chapterId,
       prompt,
+      imageUrl: imageUrl || undefined,
       options: normalizedOptions,
+      optionImages: optionImages || {},
       correctAnswer: String(correctAnswer).trim(),
       explanation,
+      explanationImageUrl: explanationImageUrl || undefined,
       difficulty,
       questionType: normalizedQuestionType,
       tags: Array.isArray(tags) ? tags.map((tag) => String(tag).trim().toLowerCase()) : [],
@@ -210,5 +313,21 @@ export async function deactivateQuestion(request, response) {
   } catch (error) {
     console.error(error);
     return response.status(500).json({ error: "Failed to deactivate question." });
+  }
+}
+
+export async function reactivateQuestion(request, response) {
+  try {
+    const question = await Question.findById(request.params.questionId);
+    if (!question) return response.status(404).json({ error: "Question not found." });
+    const subject = await Subject.exists({ _id: question.subjectId, isActive: true });
+    const chapter = !question.chapterId || await Chapter.exists({ _id: question.chapterId, isActive: true });
+    if (!subject || !chapter) return response.status(400).json({ error: "Reactivate the subject and chapter before this question." });
+    question.isActive = true;
+    await question.save();
+    return response.json({ question });
+  } catch (error) {
+    console.error(error);
+    return response.status(500).json({ error: "Failed to reactivate question." });
   }
 }

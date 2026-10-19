@@ -8,7 +8,9 @@ import { Subject } from "../models/Subject.js";
 
 export async function listPublishedExams(request, response) {
   try {
-    const exams = await Exam.find({ status: "published" })
+    const canManage = ["admin", "content_manager"].includes(request.user?.role);
+    const filter = request.query.includeAll === "true" && canManage ? {} : { status: "published" };
+    const exams = await Exam.find(filter)
       .populate("subjectId", "name code stream gradeLevel")
       .sort({ createdAt: -1 })
       .limit(100);
@@ -16,6 +18,31 @@ export async function listPublishedExams(request, response) {
   } catch (error) {
     console.error(error);
     return response.status(500).json({ error: "Failed to fetch exams." });
+  }
+}
+
+export async function updateExam(request, response) {
+  try {
+    const exam = await Exam.findById(request.params.examId);
+    if (!exam) return response.status(404).json({ error: "Exam not found." });
+    const { title, description, type, subjectId, chapterIds, questionIds, durationMinutes, passingScore, accessLevel, randomizeQuestions, randomizeOptions } = request.body;
+    const nextSubjectId = subjectId || String(exam.subjectId);
+    const nextQuestionIds = questionIds === undefined ? exam.questionIds.map(String) : [...new Set(questionIds.map(String))];
+    if (!title && title !== undefined || !mongoose.isValidObjectId(nextSubjectId) || !Array.isArray(nextQuestionIds) || !nextQuestionIds.length || !nextQuestionIds.every((id) => mongoose.isValidObjectId(id))) {
+      return response.status(400).json({ error: "Title, an active subject, and at least one valid question are required." });
+    }
+    const subject = await Subject.findOne({ _id: nextSubjectId, isActive: true }).lean();
+    const questions = await Question.find({ _id: { $in: nextQuestionIds }, subjectId: nextSubjectId, isActive: true }).select("_id").lean();
+    if (!subject || questions.length !== nextQuestionIds.length) return response.status(400).json({ error: "All questions must be active and belong to the selected subject." });
+    const updates = { subjectId: nextSubjectId, questionIds: nextQuestionIds };
+    for (const [key, value] of Object.entries({ title, description, type, chapterIds, durationMinutes, passingScore, accessLevel, randomizeQuestions, randomizeOptions })) {
+      if (value !== undefined) updates[key] = value;
+    }
+    const updated = await Exam.findByIdAndUpdate(request.params.examId, updates, { new: true, runValidators: true });
+    return response.json({ exam: updated });
+  } catch (error) {
+    console.error(error);
+    return response.status(500).json({ error: "Failed to update exam." });
   }
 }
 
@@ -140,6 +167,17 @@ export async function archiveExam(request, response) {
   }
 }
 
+export async function restoreExam(request, response) {
+  try {
+    const exam = await Exam.findByIdAndUpdate(request.params.examId, { status: "draft" }, { new: true, runValidators: true });
+    if (!exam) return response.status(404).json({ error: "Exam not found." });
+    return response.json({ exam });
+  } catch (error) {
+    console.error(error);
+    return response.status(500).json({ error: "Failed to restore exam." });
+  }
+}
+
 export async function startExamAttempt(request, response) {
   try {
     const { examId } = request.params;
@@ -175,9 +213,16 @@ export async function startExamAttempt(request, response) {
     const questions = questionsRaw.map((q) => ({
       ...q,
       options: (q.options || []).map((opt, idx) =>
-        typeof opt === "object" && opt !== null && opt.key
-          ? opt
-          : { key: String.fromCharCode(65 + idx), text: String(opt) }
+        (() => {
+          const key = typeof opt === "object" && opt !== null && opt.key
+            ? String(opt.key)
+            : String.fromCharCode(65 + idx);
+          return {
+            ...(typeof opt === "object" && opt !== null ? opt : { text: String(opt) }),
+            key,
+            imageUrl: opt?.imageUrl || q.optionImages?.[key] || undefined
+          };
+        })()
       )
     }));
 
@@ -213,7 +258,7 @@ export async function submitExamAttempt(request, response) {
     }
 
     const questions = await Question.find({ _id: { $in: exam.questionIds } })
-      .select("correctAnswer")
+      .select("correctAnswer options")
       .lean();
     const questionsById = new Map(questions.map((question) => [String(question._id), question]));
 
@@ -247,7 +292,42 @@ export async function submitExamAttempt(request, response) {
     attempt.submittedAt = new Date();
 
     await attempt.save();
-    return response.json({ attempt });
+    const gradedAnswersById = new Map(
+      gradedAnswers.map((answer) => [String(answer.questionId), answer])
+    );
+    const questionResults = exam.questionIds.map((questionId) => {
+      const question = questionsById.get(String(questionId));
+      const gradedAnswer = gradedAnswersById.get(String(questionId));
+      const selectedAnswer = gradedAnswer?.selectedOptionKeys?.[0] ?? gradedAnswer?.response;
+      const options = question?.options || [];
+      const optionText = (key) => {
+        const index = options.findIndex((option, optionIndex) =>
+          typeof option === "object" && option !== null && option.key
+            ? String(option.key) === String(key)
+            : String.fromCharCode(65 + optionIndex) === String(key)
+        );
+        if (index < 0) return undefined;
+        const option = options[index];
+        return typeof option === "object" ? option.text || option.label : String(option);
+      };
+
+      return {
+        questionId,
+        selectedAnswer,
+        selectedAnswerText: optionText(selectedAnswer) || selectedAnswer,
+        correctAnswer: question?.correctAnswer,
+        correctAnswerText: optionText(question?.correctAnswer) || question?.correctAnswer,
+        isCorrect: Boolean(gradedAnswer?.isCorrect)
+      };
+    });
+
+    return response.json({
+      attempt: {
+        ...attempt.toObject(),
+        totalMarks: questions.length,
+        questionResults
+      }
+    });
   } catch (error) {
     console.error(error);
     return response.status(500).json({ error: "Failed to submit exam attempt." });

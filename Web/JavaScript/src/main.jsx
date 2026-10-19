@@ -255,13 +255,14 @@ function SubjectsPage({ user }) {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState({ text: "", type: "success" });
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: "", code: "", description: "", gradeLevel: "" });
+  const [editingSubject, setEditingSubject] = useState(null);
+  const [form, setForm] = useState({ name: "", code: "", description: "", gradeLevel: "", stream: "both" });
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiRequest("/question-bank/subjects");
+      const res = await apiRequest("/question-bank/subjects?includeInactive=true");
       setSubjects(res.subjects);
     } catch (e) { setMsg({ text: e.message, type: "error" }); }
     finally { setLoading(false); }
@@ -269,17 +270,32 @@ function SubjectsPage({ user }) {
 
   useEffect(() => { load(); }, [load]);
 
-  async function createSubject(e) {
+  async function saveSubject(e) {
     e.preventDefault();
     setSaving(true);
     try {
-      await apiRequest("/question-bank/subjects", { method: "POST", body: JSON.stringify(form) });
-      setMsg({ text: "Subject created successfully.", type: "success" });
+      await apiRequest(editingSubject ? `/question-bank/subjects/${editingSubject._id}` : "/question-bank/subjects", { method: editingSubject ? "PATCH" : "POST", body: JSON.stringify(form) });
+      setMsg({ text: editingSubject ? "Subject updated successfully." : "Subject created successfully.", type: "success" });
       setShowModal(false);
-      setForm({ name: "", code: "", description: "", gradeLevel: "" });
+      setEditingSubject(null);
+      setForm({ name: "", code: "", description: "", gradeLevel: "", stream: "both" });
       load();
     } catch (err) { setMsg({ text: err.message, type: "error" }); }
     finally { setSaving(false); }
+  }
+
+  function openEdit(subject) {
+    setEditingSubject(subject);
+    setForm({ name: subject.name, code: subject.code, description: subject.description || "", gradeLevel: subject.gradeLevel || "", stream: subject.stream || "both" });
+    setShowModal(true);
+  }
+
+  async function reactivate(id) {
+    try {
+      await apiRequest(`/question-bank/subjects/${id}/reactivate`, { method: "PATCH" });
+      setMsg({ text: "Subject reactivated. Reactivate its chapters and questions separately as needed.", type: "success" });
+      load();
+    } catch (err) { setMsg({ text: err.message, type: "error" }); }
   }
 
   async function deactivate(id) {
@@ -302,7 +318,7 @@ function SubjectsPage({ user }) {
             <h1>Subjects</h1>
             <p className="page-desc">Manage exam subject categories for the question bank.</p>
           </div>
-          {canManage && <button className="btn btn-primary" onClick={() => setShowModal(true)}><PlusIcon size={16} /> New Subject</button>}
+          {canManage && <button className="btn btn-primary" onClick={() => { setEditingSubject(null); setForm({ name: "", code: "", description: "", gradeLevel: "", stream: "both" }); setShowModal(true); }}><PlusIcon size={16} /> New Subject</button>}
         </div>
       </div>
       <div className="content-body">
@@ -327,7 +343,7 @@ function SubjectsPage({ user }) {
                       <td className="td-muted">{s.gradeLevel || "—"}</td>
                       <td className="td-muted">{s.description || "—"}</td>
                       <td>{statusBadge(s.isActive ? "active" : "archived")}</td>
-                      {canManage && <td><div className="td-actions">{s.isActive && <button className="btn btn-sm btn-danger" onClick={() => deactivate(s._id)}>Deactivate</button>}</div></td>}
+                      {canManage && <td><div className="td-actions"><button className="btn btn-sm btn-secondary" onClick={() => openEdit(s)}>Edit</button>{s.isActive ? <button className="btn btn-sm btn-danger" onClick={() => deactivate(s._id)}>Deactivate</button> : <button className="btn btn-sm btn-success" onClick={() => reactivate(s._id)}>Reactivate</button>}</div></td>}
                     </tr>
                   ))}
                 </tbody>
@@ -341,23 +357,41 @@ function SubjectsPage({ user }) {
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
           <div className="modal">
             <div className="modal-header">
-              <h2>New Subject</h2>
+              <h2>{editingSubject ? "Edit Subject" : "New Subject"}</h2>
               <button className="modal-close" onClick={() => setShowModal(false)} aria-label="Close"><XIcon size={18} /></button>
             </div>
-            <form onSubmit={createSubject}>
+            <form onSubmit={saveSubject}>
               <div className="modal-body">
                 <div className="form-grid">
                   <div className="form-row">
                     <div className="field"><label>Subject Name *</label><input required placeholder="e.g. Mathematics" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
                     <div className="field"><label>Code *</label><input required placeholder="e.g. MATH" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} /></div>
                   </div>
-                  <div className="field"><label>Grade Level</label><input placeholder="e.g. Grade 12" value={form.gradeLevel} onChange={e => setForm({ ...form, gradeLevel: e.target.value })} /></div>
+                  <div className="field">
+                    <label>Stream *</label>
+                    <select value={form.stream} onChange={e => setForm({ ...form, stream: e.target.value })}>
+                      <option value="both">Both streams</option>
+                      <option value="natural">Natural Science</option>
+                      <option value="social">Social Science</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>Grade Level</label>
+                    <select value={form.gradeLevel} onChange={e => setForm({ ...form, gradeLevel: e.target.value })}>
+                      <option value="">Use system default (Grade 12)</option>
+                      <option value="grade-9">Grade 9</option>
+                      <option value="grade-10">Grade 10</option>
+                      <option value="grade-11">Grade 11</option>
+                      <option value="grade-12">Grade 12</option>
+                      <option value="college">College</option>
+                    </select>
+                  </div>
                   <div className="field"><label>Description</label><textarea placeholder="Brief description of this subject…" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
                 </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Creating…" : "Create Subject"}</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : editingSubject ? "Save Changes" : "Create Subject"}</button>
               </div>
             </form>
           </div>
@@ -378,29 +412,30 @@ function QuestionsPage({ user }) {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ text: "", type: "success" });
   const [showModal, setShowModal] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     subjectId: "", chapterId: "", prompt: "", correctAnswer: "",
-    explanation: "", difficulty: "medium", questionType: "multiple_choice",
+    explanation: "", imageUrl: "", optionImages: {}, explanationImageUrl: "", difficulty: "medium", questionType: "multiple_choice",
     options: ["", "", "", ""],
   });
   const [chapters, setChapters] = useState([]);
   const canManage = ["admin", "content_manager"].includes(user.role);
 
   useEffect(() => {
-    apiRequest("/question-bank/subjects").then(r => setSubjects(r.subjects)).catch(() => {});
+    apiRequest("/question-bank/subjects?includeInactive=true").then(r => setSubjects(r.subjects)).catch(() => {});
   }, []);
 
   useEffect(() => {
     if (form.subjectId) {
-      apiRequest(`/question-bank/subjects/${form.subjectId}/chapters`).then(r => setChapters(r.chapters)).catch(() => setChapters([]));
+      apiRequest(`/question-bank/subjects/${form.subjectId}/chapters?includeInactive=true`).then(r => setChapters(r.chapters)).catch(() => setChapters([]));
     } else { setChapters([]); }
   }, [form.subjectId]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const q = filterSubject ? `?subjectId=${filterSubject}` : "";
+      const q = filterSubject ? `?subjectId=${filterSubject}&includeInactive=true` : "?includeInactive=true";
       const res = await apiRequest(`/question-bank/questions${q}`);
       setQuestions(res.questions);
     } catch (e) { setMsg({ text: e.message, type: "error" }); }
@@ -409,7 +444,7 @@ function QuestionsPage({ user }) {
 
   useEffect(() => { load(); }, [load]);
 
-  async function createQuestion(e) {
+  async function saveQuestion(e) {
     e.preventDefault();
     setSaving(true);
     try {
@@ -418,13 +453,39 @@ function QuestionsPage({ user }) {
         options: form.questionType === "multiple_choice" ? form.options.filter(o => o.trim()) : [],
         chapterId: form.chapterId || undefined,
       };
-      await apiRequest("/question-bank/questions", { method: "POST", body: JSON.stringify(payload) });
-      setMsg({ text: "Question created.", type: "success" });
+      await apiRequest(editingQuestion ? `/question-bank/questions/${editingQuestion._id}` : "/question-bank/questions", { method: editingQuestion ? "PATCH" : "POST", body: JSON.stringify(payload) });
+      setMsg({ text: editingQuestion ? "Question updated." : "Question created.", type: "success" });
       setShowModal(false);
-      setForm({ subjectId: "", chapterId: "", prompt: "", correctAnswer: "", explanation: "", difficulty: "medium", questionType: "multiple_choice", options: ["", "", "", ""] });
+      setEditingQuestion(null);
+      setForm({ subjectId: "", chapterId: "", prompt: "", correctAnswer: "", explanation: "", imageUrl: "", optionImages: {}, explanationImageUrl: "", difficulty: "medium", questionType: "multiple_choice", options: ["", "", "", ""] });
       load();
     } catch (err) { setMsg({ text: err.message, type: "error" }); }
     finally { setSaving(false); }
+  }
+
+  function openEdit(question) {
+    setEditingQuestion(question);
+    setForm({ subjectId: String(question.subjectId), chapterId: question.chapterId ? String(question.chapterId) : "", prompt: question.prompt, correctAnswer: question.correctAnswer || "", explanation: question.explanation || "", imageUrl: question.imageUrl || "", optionImages: question.optionImages || {}, explanationImageUrl: question.explanationImageUrl || "", difficulty: question.difficulty || "medium", questionType: question.questionType || "multiple_choice", options: [...(question.options || []), "", "", "", ""].slice(0, 4) });
+    setShowModal(true);
+  }
+
+  function attachImage(file, applyImage) {
+    if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 4 * 1024 * 1024) {
+      setMsg({ text: "Choose an image smaller than 4 MB.", type: "error" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => applyImage(String(reader.result));
+    reader.readAsDataURL(file);
+  }
+
+  async function reactivate(id) {
+    try {
+      await apiRequest(`/question-bank/questions/${id}/reactivate`, { method: "PATCH" });
+      setMsg({ text: "Question reactivated.", type: "success" });
+      load();
+    } catch (err) { setMsg({ text: err.message, type: "error" }); }
   }
 
   async function deactivate(id) {
@@ -441,7 +502,7 @@ function QuestionsPage({ user }) {
         <div className="breadcrumb"><span>Content</span><span className="sep">›</span><span>Question Bank</span></div>
         <div className="page-header-row">
           <div><h1>Question Bank</h1><p className="page-desc">Create and manage questions for all subjects.</p></div>
-          {canManage && <button className="btn btn-primary" onClick={() => setShowModal(true)}><PlusIcon size={16} /> New Question</button>}
+          {canManage && <button className="btn btn-primary" onClick={() => { setEditingQuestion(null); setForm({ subjectId: "", chapterId: "", prompt: "", correctAnswer: "", explanation: "", imageUrl: "", optionImages: {}, explanationImageUrl: "", difficulty: "medium", questionType: "multiple_choice", options: ["", "", "", ""] }); setShowModal(true); }}><PlusIcon size={16} /> New Question</button>}
         </div>
       </div>
       <div className="content-body">
@@ -475,7 +536,7 @@ function QuestionsPage({ user }) {
                         <td>{statusBadge(q.difficulty)}</td>
                         <td className="td-muted">{subj?.name || "—"}</td>
                         <td>{statusBadge(q.isActive ? "active" : "archived")}</td>
-                        {canManage && <td><div className="td-actions">{q.isActive && <button className="btn btn-sm btn-danger" onClick={() => deactivate(q._id)}>Deactivate</button>}</div></td>}
+                        {canManage && <td><div className="td-actions"><button className="btn btn-sm btn-secondary" onClick={() => openEdit(q)}>Edit</button>{q.isActive ? <button className="btn btn-sm btn-danger" onClick={() => deactivate(q._id)}>Deactivate</button> : <button className="btn btn-sm btn-success" onClick={() => reactivate(q._id)}>Reactivate</button>}</div></td>}
                       </tr>
                     );
                   })}
@@ -490,10 +551,10 @@ function QuestionsPage({ user }) {
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
           <div className="modal modal-lg">
             <div className="modal-header">
-              <h2>New Question</h2>
+              <h2>{editingQuestion ? "Edit Question" : "New Question"}</h2>
               <button className="modal-close" onClick={() => setShowModal(false)} aria-label="Close"><XIcon size={18} /></button>
             </div>
-            <form onSubmit={createQuestion}>
+            <form onSubmit={saveQuestion}>
               <div className="modal-body">
                 <div className="form-grid">
                   <div className="form-row">
@@ -531,7 +592,19 @@ function QuestionsPage({ user }) {
                       </select>
                     </div>
                   </div>
-                  <div className="field"><label>Question Prompt *</label><textarea required rows={3} placeholder="Type the full question…" value={form.prompt} onChange={e => setForm({ ...form, prompt: e.target.value })} /></div>
+                  <div className="field">
+                    <label>Question Prompt *</label>
+                    <textarea required rows={4} placeholder={'Example: What is \\frac{1}{2} + \\sqrt{9}?  You can use LaTeX-style text: \\frac{a}{b}, \\sqrt{x}, \\int_a^b, \\pi, x^2.'} value={form.prompt} onChange={e => setForm({ ...form, prompt: e.target.value })} />
+                    <small className="td-muted">Use plain text or LaTeX-style math. The mobile app formats common roots, fractions, powers, integrals, Greek letters, and π.</small>
+                  </div>
+                  <div className="field">
+                    <label>Graph or diagram (optional)</label>
+                    <input type="file" accept="image/*" onChange={e => attachImage(e.target.files?.[0], imageUrl => setForm(current => ({ ...current, imageUrl })))} />
+                    <small className="td-muted">Upload a graph, geometry figure, or table image (max 4 MB), or paste an image URL below.</small>
+                    <input type="url" placeholder="https://example.com/graph.png" value={form.imageUrl.startsWith("data:") ? "" : form.imageUrl} onChange={e => setForm({ ...form, imageUrl: e.target.value })} />
+                    {form.imageUrl ? <img src={form.imageUrl} alt="Question diagram preview" style={{ maxWidth: "100%", maxHeight: 220, objectFit: "contain", marginTop: 8, borderRadius: 8 }} /> : null}
+                    {form.imageUrl.startsWith("data:") ? <button type="button" className="btn btn-sm btn-secondary" onClick={() => setForm({ ...form, imageUrl: "" })}>Remove uploaded diagram</button> : null}
+                  </div>
 
                   {form.questionType === "multiple_choice" && (
                     <>
@@ -540,7 +613,33 @@ function QuestionsPage({ user }) {
                         {["A", "B", "C", "D"].map((key, idx) => (
                           <div key={key} style={{ display: "flex", gap: 10, alignItems: "center" }}>
                             <span className="badge badge-gray" style={{ width: 28, justifyContent: "center" }}>{key}</span>
-                            <input placeholder={`Option ${key}`} value={form.options[idx]} onChange={e => { const opts = [...form.options]; opts[idx] = e.target.value; setForm({ ...form, options: opts }); }} />
+                            <div style={{ flex: 1 }}>
+                              <input placeholder={`Option ${key}`} value={form.options[idx]} onChange={e => { const opts = [...form.options]; opts[idx] = e.target.value; setForm({ ...form, options: opts }); }} />
+                              <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  aria-label={`Upload diagram for option ${key}`}
+                                  onChange={e => attachImage(e.target.files?.[0], imageUrl => setForm(current => ({ ...current, optionImages: { ...current.optionImages, [key]: imageUrl } })))}
+                                />
+                                <input
+                                  type="url"
+                                  placeholder={`Option ${key} image URL (optional)`}
+                                  value={form.optionImages?.[key]?.startsWith("data:") ? "" : (form.optionImages?.[key] || "")}
+                                  onChange={e => setForm(current => ({ ...current, optionImages: { ...current.optionImages, [key]: e.target.value } }))}
+                                />
+                              </div>
+                              {form.optionImages?.[key] ? (
+                                <div style={{ marginTop: 6 }}>
+                                  <img src={form.optionImages[key]} alt={`Option ${key} diagram preview`} style={{ maxWidth: 180, maxHeight: 100, objectFit: "contain", borderRadius: 6 }} />
+                                  <button type="button" className="btn btn-sm btn-secondary" style={{ marginLeft: 8 }} onClick={() => {
+                                    const optionImages = { ...form.optionImages };
+                                    delete optionImages[key];
+                                    setForm({ ...form, optionImages });
+                                  }}>Remove image</button>
+                                </div>
+                              ) : null}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -558,12 +657,21 @@ function QuestionsPage({ user }) {
                     <div className="field"><label>Correct Answer *</label><input required placeholder="Type the correct answer…" value={form.correctAnswer} onChange={e => setForm({ ...form, correctAnswer: e.target.value })} /></div>
                   )}
 
-                  <div className="field"><label>Explanation (optional)</label><textarea rows={2} placeholder="Why is this the correct answer?" value={form.explanation} onChange={e => setForm({ ...form, explanation: e.target.value })} /></div>
+                  <div className="field">
+                    <label>Explanation (optional)</label>
+                    <textarea rows={2} placeholder="Why is this the correct answer? You can use LaTeX-style notation such as \frac{a}{b}, \sqrt{x}, x^2, and \pi." value={form.explanation} onChange={e => setForm({ ...form, explanation: e.target.value })} />
+                    <label style={{ marginTop: 8 }}>Explanation diagram (optional)</label>
+                    <input type="file" accept="image/*" onChange={e => attachImage(e.target.files?.[0], imageUrl => setForm(current => ({ ...current, explanationImageUrl: imageUrl })))} />
+                    <small className="td-muted">Upload a worked graph, geometry figure, table, or diagram (max 4 MB), or paste an image URL.</small>
+                    <input type="url" placeholder="https://example.com/explanation.png" value={form.explanationImageUrl.startsWith("data:") ? "" : form.explanationImageUrl} onChange={e => setForm({ ...form, explanationImageUrl: e.target.value })} />
+                    {form.explanationImageUrl ? <img src={form.explanationImageUrl} alt="Explanation diagram preview" style={{ maxWidth: "100%", maxHeight: 220, objectFit: "contain", marginTop: 8, borderRadius: 8 }} /> : null}
+                    {form.explanationImageUrl.startsWith("data:") ? <button type="button" className="btn btn-sm btn-secondary" onClick={() => setForm({ ...form, explanationImageUrl: "" })}>Remove uploaded diagram</button> : null}
+                  </div>
                 </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : "Create Question"}</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : editingQuestion ? "Save Changes" : "Create Question"}</button>
               </div>
             </form>
           </div>
@@ -584,6 +692,7 @@ function ExamsPage({ user }) {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState({ text: "", type: "success" });
   const [showModal, setShowModal] = useState(false);
+  const [editingExam, setEditingExam] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: "", description: "", subjectId: "", durationMinutes: 60,
@@ -604,7 +713,7 @@ function ExamsPage({ user }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiRequest("/exams");
+      const res = await apiRequest("/exams?includeAll=true");
       setExams(res.exams);
     } catch (e) { setMsg({ text: e.message, type: "error" }); }
     finally { setLoading(false); }
@@ -612,18 +721,25 @@ function ExamsPage({ user }) {
 
   useEffect(() => { load(); }, [load]);
 
-  async function createExam(e) {
+  async function saveExam(e) {
     e.preventDefault();
     if (form.questionIds.length === 0) { setMsg({ text: "Select at least one question.", type: "error" }); return; }
     setSaving(true);
     try {
-      await apiRequest("/exams", { method: "POST", body: JSON.stringify({ ...form, durationMinutes: Number(form.durationMinutes), passingScore: Number(form.passingScore) }) });
-      setMsg({ text: "Exam created as draft.", type: "success" });
+      await apiRequest(editingExam ? `/exams/${editingExam._id}` : "/exams", { method: editingExam ? "PATCH" : "POST", body: JSON.stringify({ ...form, durationMinutes: Number(form.durationMinutes), passingScore: Number(form.passingScore) }) });
+      setMsg({ text: editingExam ? "Exam updated." : "Exam created as draft.", type: "success" });
       setShowModal(false);
+      setEditingExam(null);
       setForm({ title: "", description: "", subjectId: "", durationMinutes: 60, passingScore: 50, accessLevel: "free", questionIds: [] });
       load();
     } catch (err) { setMsg({ text: err.message, type: "error" }); }
     finally { setSaving(false); }
+  }
+
+  function openEdit(exam) {
+    setEditingExam(exam);
+    setForm({ title: exam.title, description: exam.description || "", subjectId: String(exam.subjectId?._id || exam.subjectId), durationMinutes: exam.durationMinutes, passingScore: exam.passingScore, accessLevel: exam.accessLevel, questionIds: (exam.questionIds || []).map(String) });
+    setShowModal(true);
   }
 
   async function publish(id) {
@@ -642,6 +758,14 @@ function ExamsPage({ user }) {
     } catch (err) { setMsg({ text: err.message, type: "error" }); }
   }
 
+  async function restore(id) {
+    try {
+      await apiRequest(`/exams/${id}/restore`, { method: "PATCH" });
+      setMsg({ text: "Exam restored as a draft.", type: "success" });
+      load();
+    } catch (err) { setMsg({ text: err.message, type: "error" }); }
+  }
+
   function toggleQuestion(id) {
     setForm(f => ({
       ...f, questionIds: f.questionIds.includes(id) ? f.questionIds.filter(q => q !== id) : [...f.questionIds, id],
@@ -654,7 +778,7 @@ function ExamsPage({ user }) {
         <div className="breadcrumb"><span>Content</span><span className="sep">›</span><span>Exams</span></div>
         <div className="page-header-row">
           <div><h1>Exams</h1><p className="page-desc">Create, publish, and archive practice exams for students.</p></div>
-          {canManage && <button className="btn btn-primary" onClick={() => setShowModal(true)}><PlusIcon size={16} /> New Exam</button>}
+          {canManage && <button className="btn btn-primary" onClick={() => { setEditingExam(null); setForm({ title: "", description: "", subjectId: "", durationMinutes: 60, passingScore: 50, accessLevel: "free", questionIds: [] }); setShowModal(true); }}><PlusIcon size={16} /> New Exam</button>}
         </div>
       </div>
       <div className="content-body">
@@ -680,8 +804,10 @@ function ExamsPage({ user }) {
                       <td>{statusBadge(ex.status)}</td>
                       {canManage && (
                         <td><div className="td-actions">
+                          <button className="btn btn-sm btn-secondary" onClick={() => openEdit(ex)}>Edit</button>
                           {ex.status === "draft" && <button className="btn btn-sm btn-success" onClick={() => publish(ex._id)}>Publish</button>}
                           {ex.status === "published" && <button className="btn btn-sm btn-amber" onClick={() => archive(ex._id)}>Archive</button>}
+                          {ex.status === "archived" && <button className="btn btn-sm btn-success" onClick={() => restore(ex._id)}>Restore</button>}
                         </div></td>
                       )}
                     </tr>
@@ -697,10 +823,10 @@ function ExamsPage({ user }) {
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
           <div className="modal modal-lg">
             <div className="modal-header">
-              <h2>New Exam</h2>
+              <h2>{editingExam ? "Edit Exam" : "New Exam"}</h2>
               <button className="modal-close" onClick={() => setShowModal(false)} aria-label="Close"><XIcon size={18} /></button>
             </div>
-            <form onSubmit={createExam}>
+            <form onSubmit={saveExam}>
               <div className="modal-body">
                 <div className="form-grid">
                   <div className="field"><label>Exam Title *</label><input required placeholder="e.g. Grade 12 Mathematics Mock Exam" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
@@ -746,7 +872,7 @@ function ExamsPage({ user }) {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Creating…" : "Create Exam"}</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : editingExam ? "Save Changes" : "Create Exam"}</button>
               </div>
             </form>
           </div>
@@ -1440,42 +1566,59 @@ function ChaptersPage({ user }) {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ text: "", type: "success" });
   const [showModal, setShowModal] = useState(false);
+  const [editingChapter, setEditingChapter] = useState(null);
   const [form, setForm] = useState({ title: "", description: "", order: 1 });
   const [saving, setSaving] = useState(false);
   const canManage = ["admin", "content_manager"].includes(user.role);
 
   useEffect(() => {
-    apiRequest("/question-bank/subjects").then(r => setSubjects(r.subjects)).catch(() => {});
+    apiRequest("/question-bank/subjects?includeInactive=true").then(r => setSubjects(r.subjects)).catch(() => {});
   }, []);
 
   useEffect(() => {
     if (!selectedSubject) { setChapters([]); return; }
     setLoading(true);
-    apiRequest(`/question-bank/subjects/${selectedSubject}/chapters`)
+    apiRequest(`/question-bank/subjects/${selectedSubject}/chapters?includeInactive=true`)
       .then(r => setChapters(r.chapters))
       .catch(e => setMsg({ text: e.message, type: "error" }))
       .finally(() => setLoading(false));
   }, [selectedSubject]);
 
-  async function createChapter(e) {
+  async function saveChapter(e) {
     e.preventDefault();
     setSaving(true);
     try {
-      await apiRequest(`/question-bank/subjects/${selectedSubject}/chapters`, { method: "POST", body: JSON.stringify(form) });
-      setMsg({ text: "Chapter created.", type: "success" });
+      await apiRequest(editingChapter ? `/question-bank/chapters/${editingChapter._id}` : `/question-bank/subjects/${selectedSubject}/chapters`, { method: editingChapter ? "PATCH" : "POST", body: JSON.stringify(form) });
+      setMsg({ text: editingChapter ? "Chapter updated." : "Chapter created.", type: "success" });
       setShowModal(false);
+      setEditingChapter(null);
       setForm({ title: "", description: "", order: 1 });
-      const r = await apiRequest(`/question-bank/subjects/${selectedSubject}/chapters`);
+      const r = await apiRequest(`/question-bank/subjects/${selectedSubject}/chapters?includeInactive=true`);
       setChapters(r.chapters);
     } catch (err) { setMsg({ text: err.message, type: "error" }); }
     finally { setSaving(false); }
+  }
+
+  function openEdit(chapter) {
+    setEditingChapter(chapter);
+    setForm({ title: chapter.title, description: chapter.description || "", order: chapter.order || 1 });
+    setShowModal(true);
+  }
+
+  async function reactivate(id) {
+    try {
+      await apiRequest(`/question-bank/chapters/${id}/reactivate`, { method: "PATCH" });
+      setMsg({ text: "Chapter reactivated.", type: "success" });
+      const r = await apiRequest(`/question-bank/subjects/${selectedSubject}/chapters?includeInactive=true`);
+      setChapters(r.chapters);
+    } catch (err) { setMsg({ text: err.message, type: "error" }); }
   }
 
   async function deactivate(id) {
     try {
       await apiRequest(`/question-bank/chapters/${id}/deactivate`, { method: "PATCH" });
       setMsg({ text: "Chapter deactivated.", type: "success" });
-      const r = await apiRequest(`/question-bank/subjects/${selectedSubject}/chapters`);
+      const r = await apiRequest(`/question-bank/subjects/${selectedSubject}/chapters?includeInactive=true`);
       setChapters(r.chapters);
     } catch (err) { setMsg({ text: err.message, type: "error" }); }
   }
@@ -1486,7 +1629,7 @@ function ChaptersPage({ user }) {
         <div className="breadcrumb"><span>Content</span><span className="sep">›</span><span>Chapters</span></div>
         <div className="page-header-row">
           <div><h1>Chapters</h1><p className="page-desc">Organise subjects into chapters for structured learning.</p></div>
-          {canManage && selectedSubject && <button className="btn btn-primary" onClick={() => setShowModal(true)}><PlusIcon size={16} /> New Chapter</button>}
+          {canManage && selectedSubject && <button className="btn btn-primary" onClick={() => { setEditingChapter(null); setForm({ title: "", description: "", order: 1 }); setShowModal(true); }}><PlusIcon size={16} /> New Chapter</button>}
         </div>
       </div>
       <div className="content-body">
@@ -1517,7 +1660,7 @@ function ChaptersPage({ user }) {
                         <td><strong>{c.title}</strong></td>
                         <td className="td-muted">{c.description || "—"}</td>
                         <td>{statusBadge(c.isActive ? "active" : "archived")}</td>
-                        {canManage && <td><div className="td-actions">{c.isActive && <button className="btn btn-sm btn-danger" onClick={() => deactivate(c._id)}>Deactivate</button>}</div></td>}
+                        {canManage && <td><div className="td-actions"><button className="btn btn-sm btn-secondary" onClick={() => openEdit(c)}>Edit</button>{c.isActive ? <button className="btn btn-sm btn-danger" onClick={() => deactivate(c._id)}>Deactivate</button> : <button className="btn btn-sm btn-success" onClick={() => reactivate(c._id)}>Reactivate</button>}</div></td>}
                       </tr>
                     ))}
                   </tbody>
@@ -1531,8 +1674,8 @@ function ChaptersPage({ user }) {
       {showModal && (
         <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
           <div className="modal">
-            <div className="modal-header"><h2>New Chapter</h2><button className="modal-close" onClick={() => setShowModal(false)} aria-label="Close"><XIcon size={18} /></button></div>
-            <form onSubmit={createChapter}>
+            <div className="modal-header"><h2>{editingChapter ? "Edit Chapter" : "New Chapter"}</h2><button className="modal-close" onClick={() => setShowModal(false)} aria-label="Close"><XIcon size={18} /></button></div>
+            <form onSubmit={saveChapter}>
               <div className="modal-body">
                 <div className="form-grid">
                   <div className="field"><label>Chapter Title *</label><input required placeholder="e.g. Algebra Fundamentals" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
@@ -1542,7 +1685,7 @@ function ChaptersPage({ user }) {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : "Create Chapter"}</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : editingChapter ? "Save Changes" : "Create Chapter"}</button>
               </div>
             </form>
           </div>

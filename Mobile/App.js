@@ -104,7 +104,7 @@ function MainDashboard({ user, onLogout }) {
     setLoadingExamId(examItem._id);
     setNotice(null);
     try {
-      const examData = await request(`/exams/${examItem._id}/start`);
+      const examData = await request(`/exams/${examItem._id}/start`, { method: "POST" });
       setActiveExamSession(examData);
     } catch (error) {
       setNotice({ type: "error", message: error.message || "Failed to start exam session." });

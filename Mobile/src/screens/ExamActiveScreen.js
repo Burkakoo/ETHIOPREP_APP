@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Button } from "../components/Button.js";
 import { Card } from "../components/Card.js";
@@ -8,6 +8,42 @@ import { Icon } from "../components/Icon.js";
 import { COLORS, RADIUS, SPACING } from "../utils/theme.js";
 
 const FAVORITES_KEY = "ethioprep_favorite_questions";
+
+const SUPERSCRIPTS = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "+": "⁺", "-": "⁻", "=": "⁼", "(": "⁽", ")": "⁾", "n": "ⁿ", "x": "ˣ" };
+
+function formatMath(value = "") {
+  return String(value)
+    .replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, "($1)/($2)")
+    .replace(/\\sqrt\{([^{}]+)\}/g, "√($1)")
+    .replace(/\\int_\{?([^{}]+)\}?\^\{?([^{}]+)\}?/g, "∫_$1^$2")
+    .replace(/\\(pi|theta|alpha|beta|gamma|delta|lambda|mu|sigma|omega|times|cdot|leq|geq|neq)/g, (_match, symbol) => ({
+      pi: "π", theta: "θ", alpha: "α", beta: "β", gamma: "γ", delta: "δ", lambda: "λ", mu: "μ",
+      sigma: "σ", omega: "ω", times: "×", cdot: "·", leq: "≤", geq: "≥", neq: "≠"
+    }[symbol]))
+    .replace(/\^\{([^{}]+)\}/g, (_match, power) => [...power].map(char => SUPERSCRIPTS[char] || char).join(""))
+    .replace(/_\{([^{}]+)\}/g, (_match, subscript) => `₍${subscript}₎`)
+    .replace(/\^([0-9nx+\-()=])/g, (_match, power) => SUPERSCRIPTS[power] || power);
+}
+
+function MathText({ children, style }) {
+  return <Text style={style}>{formatMath(children)}</Text>;
+}
+
+function QuestionDiagram({ uri, style }) {
+  const [aspectRatio, setAspectRatio] = useState(1);
+
+  return (
+    <Image
+      source={{ uri }}
+      resizeMode="contain"
+      onLoad={({ nativeEvent }) => {
+        const { width, height } = nativeEvent.source || {};
+        if (width && height) setAspectRatio(width / height);
+      }}
+      style={[styles.questionDiagram, style, { aspectRatio }]}
+    />
+  );
+}
 
 export function ExamActiveScreen({ examData, onSubmit, onExit, submitting }) {
   const [answers, setAnswers] = useState({});
@@ -73,6 +109,9 @@ export function ExamActiveScreen({ examData, onSubmit, onExit, submitting }) {
   const exam = examData?.exam;
   const attempt = examData?.attempt;
   const questions = exam?.questions || [];
+  const resultByQuestionId = new Map(
+    (result?.questionResults || []).map((item) => [String(item.questionId), item])
+  );
 
   function handleSelectOption(questionId, optionKey) {
     if (result) return; // locked after submission
@@ -99,8 +138,9 @@ export function ExamActiveScreen({ examData, onSubmit, onExit, submitting }) {
   // Compute question correctness if result available
   const questionsWithStatus = questions.map((q) => {
     const userSelected = answers[q._id];
-    const isCorrect = q.correctAnswer ? userSelected === q.correctAnswer : true;
-    return { ...q, userSelected, isCorrect };
+    const review = resultByQuestionId.get(String(q._id));
+    const isCorrect = review ? review.isCorrect : true;
+    return { ...q, userSelected, isCorrect, review };
   });
 
   const displayedQuestions = filterMistakesOnly
@@ -229,12 +269,13 @@ export function ExamActiveScreen({ examData, onSubmit, onExit, submitting }) {
               </View>
             )}
 
-            <Text style={styles.prompt}>{question.prompt}</Text>
+            <MathText style={styles.prompt}>{question.prompt}</MathText>
+            {question.imageUrl ? <QuestionDiagram uri={question.imageUrl} /> : null}
 
             <View style={styles.optionsList}>
               {(question.options || []).map((option) => {
                 const isSelected = selected === option.key;
-                const isTheCorrectAnswer = result && question.correctAnswer === option.key;
+                const isTheCorrectAnswer = result && question.review?.correctAnswer === option.key;
                 const isUserMistake = result && isSelected && !question.isCorrect;
 
                 return (
@@ -268,7 +309,7 @@ export function ExamActiveScreen({ examData, onSubmit, onExit, submitting }) {
                     >
                       {option.key}.
                     </Text>
-                    <Text
+                    <MathText
                       style={[
                         styles.optionText,
                         isSelected && styles.optionTextSelected,
@@ -276,16 +317,30 @@ export function ExamActiveScreen({ examData, onSubmit, onExit, submitting }) {
                       ]}
                     >
                       {option.text || option.label}
-                    </Text>
+                    </MathText>
+                    {option.imageUrl ? <QuestionDiagram uri={option.imageUrl} style={styles.optionDiagram} /> : null}
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            {result && question.explanation ? (
+            {result && question.review && !question.review.isCorrect ? (
+              <View style={styles.answerReviewBox}>
+                <Text style={styles.answerReviewTitle}>Review your answer</Text>
+                <MathText style={styles.incorrectAnswerText}>
+                  Your answer: {question.review.selectedAnswerText || "Not answered"}
+                </MathText>
+                <MathText style={styles.correctAnswerText}>
+                  Correct answer: {question.review.correctAnswerText || question.review.correctAnswer}
+                </MathText>
+              </View>
+            ) : null}
+
+            {result && (question.explanation || question.explanationImageUrl) ? (
               <View style={styles.explanationBox}>
                 <Text style={styles.explanationTitle}>Explanation:</Text>
-                <Text style={styles.explanationContent}>{question.explanation}</Text>
+                {question.explanation ? <MathText style={styles.explanationContent}>{question.explanation}</MathText> : null}
+                {question.explanationImageUrl ? <QuestionDiagram uri={question.explanationImageUrl} /> : null}
               </View>
             ) : null}
           </Card>
@@ -414,6 +469,18 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: SPACING.md
   },
+  questionDiagram: {
+    width: "100%",
+    marginBottom: SPACING.md,
+    borderRadius: RADIUS.sm
+  },
+  optionDiagram: {
+    flexBasis: 90,
+    width: 90,
+    maxHeight: 90,
+    marginBottom: 0,
+    marginLeft: SPACING.sm
+  },
   optionsList: {
     gap: SPACING.sm
   },
@@ -482,6 +549,29 @@ const styles = StyleSheet.create({
   explanationContent: {
     fontSize: 13,
     color: COLORS.text,
+    lineHeight: 18
+  },
+  answerReviewBox: {
+    marginTop: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.dangerBg,
+    borderRadius: RADIUS.md,
+    gap: 4
+  },
+  answerReviewTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: COLORS.danger
+  },
+  incorrectAnswerText: {
+    fontSize: 13,
+    color: COLORS.danger,
+    lineHeight: 18
+  },
+  correctAnswerText: {
+    fontSize: 13,
+    color: COLORS.success,
+    fontWeight: "700",
     lineHeight: 18
   },
   submitBtn: {
@@ -593,4 +683,3 @@ const styles = StyleSheet.create({
     color: COLORS.onPrimary
   }
 });
-
