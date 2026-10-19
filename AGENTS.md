@@ -229,7 +229,7 @@ logger.error("Error occurred", { error, stack });
 5. **Input Validation**: ObjectId validation, custom error classes
 6. **CORS**: Supports multiple origins from environment, credentials enabled
 7. **Helmet**: Security headers enabled
-8. **Role-Based Access**: student, cash_manager, content_manager, admin
+8. **Role-Based Access**: Students use the mobile app; administrators manage all dashboard areas, content managers manage curriculum content, and cash managers manage payments
 9. **Structured Logging**: Winston logger with file output in production
 
 ## Database Indexing Strategy
@@ -295,29 +295,29 @@ The following page components remain in main.jsx and should be extracted:
 
 #### Known Issues
 
-**Metro Bundler Startup Issue** (Investigated 2026-10-18):
+**Metro Bundler Startup Issue** (Investigated 2026-10-18, updated 2026-10-18):
 - Symptom: Metro bundler hangs during startup at "Waiting on http://localhost:8081"
-- Root Cause: React 19 compatibility with the previous Expo 57 stack was suspected.
-- Current Stack:
+- Previous Stack (SDK 52):
   - React: 18.3.1
   - React Native: 0.76.9
   - Expo: ~52.0.0
-- The stack has moved to Expo SDK 52 / React 18.3.1.
-- Attempts to Fix:
+- Current Stack (SDK 57, upgraded 2026-10-18):
+  - React: 19.2.3
+  - React Native: 0.86.3
+  - Expo: ~57.0.0 (57.0.30)
+  - expo-asset: 57.0.20, expo-font: 57.0.4, expo-status-bar: 57.0.1
+  - expo-image-picker: 57.0.20, async-storage: 2.2.0
+- Upgrade was performed to match installed Expo Go SDK 57 on the user's device.
+- Previous Attempts to Fix (on SDK 52):
   - ✅ Created babel.config.js with babel-preset-expo preset
   - ✅ Created metro.config.js with Expo defaults
   - ✅ Installed babel-preset-expo package
   - ❌ Removed config files (Expo 57 may use internal config)
   - ❌ Started with --clear flag (no improvement)
   - ❌ Tried --tunnel flag (requires ngrok, unrelated issue)
-- Workaround Options:
-  1. Use Expo Go app on physical device (bypasses bundler issues)
-  2. Use Expo SDK 52 / React 18.3.1 (current stack)
-  3. Wait for Expo 58+ with better React 19 support
-  4. Use EAS Build for production builds
-- Current Status: The Android bundle builds with Expo SDK 52; the prior Metro startup symptom is not otherwise confirmed fixed.
+- Current Status: Upgraded to Expo SDK 57 / React 19.2.3 / React Native 0.86.3 to match the installed Expo Go app. The Metro bundler startup issue should be re-tested with the new stack.
 
-**Security Vulnerabilities** (22 total - 7 moderate, 15 high):
+**Security Vulnerabilities** (22 total - 7 moderate, 15 high after SDK 57 upgrade):
 - Located in Expo build tooling transitive dependencies:
   - braces (DoS via stack exhaustion)
   - node-forge (RSA signature verification)

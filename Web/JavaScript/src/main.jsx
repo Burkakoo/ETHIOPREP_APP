@@ -43,6 +43,8 @@ import { Notice } from "./components/Notice.jsx";
 import { fmtDate, getGreeting } from "./utils/helpers.js";
 import "../../CSS/styles.css";
 
+const STAFF_ROLES = ["admin", "content_manager", "cash_manager"];
+
 /* ════════════════════════════════════════════════════════════════
    AUTH
    ════════════════════════════════════════════════════════════════ */
@@ -224,7 +226,7 @@ function Overview({ user, stats }) {
                   ["Create & Publish Exams", ["admin", "content_manager"]],
                   ["Manage Question Bank", ["admin", "content_manager"]],
                   ["Verify Payments", ["admin", "cash_manager"]],
-                  ["View Analytics", ["admin", "cash_manager", "content_manager"]],
+                  ["View Analytics", ["admin"]],
                   ["Manage All Users", ["admin"]],
                 ].map(([cap, roles]) => (
                   <tr key={cap}>

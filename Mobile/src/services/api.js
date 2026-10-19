@@ -18,8 +18,8 @@ export async function login(email, password) {
     method: "POST",
     body: JSON.stringify({ email, password })
   });
-  if (result.token) {
-    await AsyncStorage.setItem("ethioprep_token", result.token);
+  if (result.accessToken) {
+    await AsyncStorage.setItem("ethioprep_token", result.accessToken);
   }
   if (result.user) {
     await AsyncStorage.setItem("ethioprep_user", JSON.stringify(result.user));
@@ -32,8 +32,8 @@ export async function register({ email, password, displayName, phoneNumber, stre
     method: "POST",
     body: JSON.stringify({ email, password, displayName, phoneNumber, stream })
   });
-  if (result.token) {
-    await AsyncStorage.setItem("ethioprep_token", result.token);
+  if (result.accessToken) {
+    await AsyncStorage.setItem("ethioprep_token", result.accessToken);
   }
   if (result.user) {
     await AsyncStorage.setItem("ethioprep_user", JSON.stringify(result.user));

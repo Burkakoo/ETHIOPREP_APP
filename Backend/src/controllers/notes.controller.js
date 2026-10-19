@@ -321,4 +321,3 @@ async function applyPaymentChange(userId, change) {
     status: "pending"
   });
 }
-

@@ -45,7 +45,7 @@ export function Overview({ user, stats }) {
                   ["Create & Publish Exams", ["admin", "content_manager"]],
                   ["Manage Question Bank", ["admin", "content_manager"]],
                   ["Verify Payments", ["admin", "cash_manager"]],
-                  ["View Analytics", ["admin", "cash_manager", "content_manager"]],
+                  ["View Analytics", ["admin"]],
                   ["Manage All Users", ["admin"]],
                 ].map(([cap, roles]) => (
                   <tr key={cap}>

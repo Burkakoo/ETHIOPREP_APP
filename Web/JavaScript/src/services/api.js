@@ -13,7 +13,7 @@ export async function apiRequest(path, options = {}) {
 }
 
 export function saveSession(session) {
-  localStorage.setItem("ethioprep_token", session.token);
+  localStorage.setItem("ethioprep_token", session.accessToken);
   localStorage.setItem("ethioprep_user", JSON.stringify(session.user));
 }
 

@@ -1,6 +1,8 @@
 import { verifyToken } from "../config/jwt.js";
 import { User } from "../models/User.js";
 
+export const STAFF_ROLES = ["admin", "content_manager", "cash_manager"];
+
 export async function requireAuth(request, response, next) {
   try {
     const authHeader = request.headers.authorization;
@@ -37,3 +39,5 @@ export function requireRole(...allowedRoles) {
     return next();
   };
 }
+
+export const requireStaffRole = requireRole(...STAFF_ROLES);
