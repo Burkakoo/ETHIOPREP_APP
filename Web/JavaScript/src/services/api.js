@@ -8,7 +8,14 @@ export async function apiRequest(path, options = {}) {
 
   const response = await fetch(`${API_URL}${path}`, { ...options, headers });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || "Request failed.");
+  if (!response.ok) {
+    const error = new Error(body.error || "Request failed.");
+    error.status = response.status;
+    error.requiresVerification = body.requiresVerification;
+    error.email = body.email;
+    error.data = body;
+    throw error;
+  }
   return body;
 }
 

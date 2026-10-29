@@ -16,6 +16,7 @@ import { Icon } from "./src/components/Icon.js";
 import { Notice } from "./src/components/Notice.js";
 import { AuthScreen } from "./src/screens/AuthScreen.js";
 import { HomeScreen } from "./src/screens/HomeScreen.js";
+import { SubjectScreen } from "./src/screens/SubjectScreen.js";
 import { ExamsScreen } from "./src/screens/ExamsScreen.js";
 import { ExamActiveScreen } from "./src/screens/ExamActiveScreen.js";
 import { NotesScreen } from "./src/screens/NotesScreen.js";
@@ -32,7 +33,6 @@ import { COLORS, RADIUS, SPACING } from "./src/utils/theme.js";
 const TABS = [
   { id: "home", label: "Home", icon: "home" },
   { id: "exams", label: "Exams", icon: "document-text" },
-  { id: "notes", label: "Notes", icon: "book" },
   { id: "progress", label: "Progress", icon: "stats-chart" },
   { id: "payments", label: "Pay", icon: "card" },
   { id: "profile", label: "Profile", icon: "person" }
@@ -63,11 +63,28 @@ function MainDashboard({ user, onLogout }) {
   const [savingProgress, setSavingProgress] = useState(false);
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [selectedSubject, setSelectedSubject] = useState(null);
 
   useEffect(() => {
+    loadCachedData();
     loadDashboardData();
     refreshQueue();
   }, []);
+
+  async function loadCachedData() {
+    try {
+      const [cachedNotes, cachedSubjects, cachedExams] = await Promise.all([
+        AsyncStorage.getItem("@ethioprep_cached_notes"),
+        AsyncStorage.getItem("@ethioprep_cached_subjects"),
+        AsyncStorage.getItem("@ethioprep_cached_exams")
+      ]);
+      if (cachedNotes) setNotes(JSON.parse(cachedNotes));
+      if (cachedSubjects) setSubjects(JSON.parse(cachedSubjects));
+      if (cachedExams) setExams(JSON.parse(cachedExams));
+    } catch {
+      // ignore
+    }
+  }
 
   async function refreshQueue() {
     try {
@@ -88,9 +105,21 @@ function MainDashboard({ user, onLogout }) {
         request("/payments")
       ]);
 
-      if (subjRes.status === "fulfilled") setSubjects(subjRes.value.subjects || []);
-      if (examsRes.status === "fulfilled") setExams(examsRes.value.exams || []);
-      if (notesRes.status === "fulfilled") setNotes(notesRes.value.notes || []);
+      if (subjRes.status === "fulfilled") {
+        const s = subjRes.value.subjects || [];
+        setSubjects(s);
+        AsyncStorage.setItem("@ethioprep_cached_subjects", JSON.stringify(s)).catch(() => {});
+      }
+      if (examsRes.status === "fulfilled") {
+        const e = examsRes.value.exams || [];
+        setExams(e);
+        AsyncStorage.setItem("@ethioprep_cached_exams", JSON.stringify(e)).catch(() => {});
+      }
+      if (notesRes.status === "fulfilled") {
+        const n = notesRes.value.notes || [];
+        setNotes(n);
+        AsyncStorage.setItem("@ethioprep_cached_notes", JSON.stringify(n)).catch(() => {});
+      }
       if (progRes.status === "fulfilled") setProgress(progRes.value.progress || []);
       if (payRes.status === "fulfilled") setPayments(payRes.value.payments || []);
     } catch (error) {
@@ -100,11 +129,15 @@ function MainDashboard({ user, onLogout }) {
     }
   }
 
-  async function handleStartExam(examItem) {
-    setLoadingExamId(examItem._id);
+  async function handleStartExam(examItem, options = {}) {
+    const loadingKey = options?.chapterId ? `${examItem._id}_${options.chapterId}` : examItem._id;
+    setLoadingExamId(loadingKey);
     setNotice(null);
     try {
-      const examData = await request(`/exams/${examItem._id}/start`, { method: "POST" });
+      const url = options?.chapterId
+        ? `/exams/${examItem._id}/start?chapterId=${options.chapterId}`
+        : `/exams/${examItem._id}/start`;
+      const examData = await request(url, { method: "POST" });
       setActiveExamSession(examData);
     } catch (error) {
       setNotice({ type: "error", message: error.message || "Failed to start exam session." });
@@ -252,7 +285,7 @@ function MainDashboard({ user, onLogout }) {
                     accessibilityRole="tab"
                     accessibilityState={{ selected: active }}
                     key={t.id}
-                    onPress={() => setTab(t.id)}
+                    onPress={() => { setSelectedSubject(null); setTab(t.id); }}
                     style={[styles.tabItem, active && styles.activeTabItem]}
                   >
                     <Icon
@@ -276,19 +309,26 @@ function MainDashboard({ user, onLogout }) {
               </View>
             )}
 
-            {!dashboardLoading && tab === "home" && (
-              <HomeScreen
-                onNavigateTab={setTab}
-                onSelectSubject={(subject) => {
-                  const subjectExam = exams.find(
-                    (e) => String(e.subjectId?._id || e.subjectId) === String(subject._id)
-                  );
-                  if (subjectExam) {
-                    handleStartExam(subjectExam);
-                  } else {
-                    setTab("exams");
-                  }
+            {!dashboardLoading && selectedSubject ? (
+              <SubjectScreen
+                exams={exams}
+                notes={notes}
+                subjects={subjects}
+                loadingExamId={loadingExamId}
+                onBack={() => setSelectedSubject(null)}
+                onNavigatePayments={() => {
+                  setSelectedSubject(null);
+                  setTab("payments");
                 }}
+                onSaveNote={handleSaveNote}
+                onStartExam={handleStartExam}
+                savingNote={savingNote}
+                subject={selectedSubject}
+                user={currentUser}
+              />
+            ) : !dashboardLoading && tab === "home" && (
+              <HomeScreen
+                onSelectSubject={setSelectedSubject}
                 subjects={subjects}
                 user={currentUser}
               />
@@ -303,14 +343,6 @@ function MainDashboard({ user, onLogout }) {
               />
             )}
 
-            {!dashboardLoading && tab === "notes" && (
-              <NotesScreen
-                notes={notes}
-                onSaveNote={handleSaveNote}
-                saving={savingNote}
-                user={currentUser}
-              />
-            )}
 
             {!dashboardLoading && tab === "progress" && (
               <ProgressScreen

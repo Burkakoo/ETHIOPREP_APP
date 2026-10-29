@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as Clipboard from "expo-clipboard";
 import { Button } from "../components/Button.js";
 import { Card } from "../components/Card.js";
 import { Input } from "../components/Input.js";
@@ -13,50 +14,68 @@ export const PAYMENT_METHODS = [
   {
     id: "telebirr",
     name: "Telebirr",
+    shortName: "Telebirr",
     accountNumber: "0915200879",
     accountName: "Burka Muhammed",
     category: "Mobile Wallet",
-    themeColor: "#008542"
+    icon: "phone-portrait-outline",
+    themeColor: "#008542",
+    themeBg: "rgba(0, 133, 66, 0.10)"
   },
   {
     id: "cbe_birr",
     name: "CBE Birr",
+    shortName: "CBE Birr",
     accountNumber: "0915200879",
     accountName: "Burka Muhammed",
     category: "Mobile Wallet",
-    themeColor: "#800080"
+    icon: "wallet-outline",
+    themeColor: "#7B2D8E",
+    themeBg: "rgba(123, 45, 142, 0.10)"
   },
   {
     id: "cbe",
     name: "Commercial Bank of Ethiopia (CBE)",
+    shortName: "CBE Bank",
     accountNumber: "1000466852841",
     accountName: "Burka Muhammed",
     category: "Bank Transfer",
-    themeColor: "#6b1480"
+    icon: "business-outline",
+    themeColor: "#6b1480",
+    themeBg: "rgba(107, 20, 128, 0.10)"
   },
   {
     id: "coop",
     name: "Cooperative Bank of Oromia (Coop)",
+    shortName: "Coop Bank",
     accountNumber: "1005100022147",
     accountName: "Burka Mohammed",
     category: "Bank Transfer",
-    themeColor: "#005a9e"
+    icon: "globe-outline",
+    themeColor: "#005a9e",
+    themeBg: "rgba(0, 90, 158, 0.10)"
   },
   {
     id: "ebirr",
     name: "E-Birr",
+    shortName: "E-Birr",
     accountNumber: "0915200879",
     accountName: "Burka Muhammed",
     category: "Mobile Wallet",
-    themeColor: "#e67e22"
+    icon: "flash-outline",
+    themeColor: "#e67e22",
+    themeBg: "rgba(230, 126, 34, 0.10)"
   },
   {
     id: "awash",
     name: "Awash Bank",
+    shortName: "Awash",
     accountNumber: "014251217719600",
     accountName: "Burka Muhammd",
     category: "Bank Transfer",
-    themeColor: "#16a085"
+    icon: "leaf-outline",
+    themeColor: "#16a085",
+    themeBg: "rgba(22, 160, 133, 0.10)"
   }
 ];
 
@@ -76,6 +95,17 @@ export function PaymentScreen({ payments = [], onSubmitPayment, submitting, user
 
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [copiedField, setCopiedField] = useState(null);
+
+  const handleCopy = useCallback(async (value, fieldName) => {
+    try {
+      await Clipboard.setStringAsync(String(value));
+      setCopiedField(fieldName);
+      setTimeout(() => setCopiedField(null), 1800);
+    } catch (err) {
+      // Fallback: the text is already selectable
+    }
+  }, []);
 
   const activeMethod = PAYMENT_METHODS.find((m) => m.id === selectedProvider) || PAYMENT_METHODS[0];
 
@@ -226,49 +256,153 @@ export function PaymentScreen({ payments = [], onSubmitPayment, submitting, user
                 onPress={() => setSelectedProvider(method.id)}
                 style={[
                   styles.providerTab,
-                  isSelected && { borderColor: COLORS.primary, backgroundColor: COLORS.primaryBg }
+                  isSelected && {
+                    borderColor: method.themeColor,
+                    backgroundColor: method.themeBg,
+                    shadowColor: method.themeColor,
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.18,
+                    shadowRadius: 6,
+                    elevation: 3
+                  }
                 ]}
               >
-                <Text
-                  style={[
-                    styles.providerTabText,
-                    isSelected && { color: COLORS.primary, fontWeight: "800" }
-                  ]}
-                >
-                  {method.name}
-                </Text>
+                <View style={styles.providerTabInner}>
+                  <View
+                    style={[
+                      styles.providerIconCircle,
+                      {
+                        backgroundColor: isSelected ? method.themeColor : COLORS.surfaceMuted
+                      }
+                    ]}
+                  >
+                    <Icon
+                      name={method.icon}
+                      size={16}
+                      color={isSelected ? "#ffffff" : COLORS.textMuted}
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.providerTabText,
+                      isSelected && {
+                        color: method.themeColor,
+                        fontWeight: "900"
+                      }
+                    ]}
+                  >
+                    {method.shortName}
+                  </Text>
+                </View>
+                {isSelected && (
+                  <View style={[styles.providerSelectedDot, { backgroundColor: method.themeColor }]} />
+                )}
               </TouchableOpacity>
             );
           })}
         </View>
 
         {/* Selected Account Detail Box */}
-        <Card style={styles.accountCard}>
+        <Card style={[styles.accountCard, { borderTopWidth: 3, borderTopColor: activeMethod.themeColor }]}>
           <View style={styles.accountHeader}>
-            <Text style={[styles.accountMethodName, { color: COLORS.primary }]}>
-              {activeMethod.name}
-            </Text>
-            <View style={styles.categoryBadge}>
-              <Text style={styles.categoryBadgeText}>{activeMethod.category}</Text>
+            <View style={styles.accountHeaderLeft}>
+              <View style={[styles.accountIconCircle, { backgroundColor: activeMethod.themeColor }]}>
+                <Icon name={activeMethod.icon} size={18} color="#ffffff" />
+              </View>
+              <Text style={[styles.accountMethodName, { color: activeMethod.themeColor }]}>
+                {activeMethod.name}
+              </Text>
+            </View>
+            <View style={[styles.categoryBadge, { backgroundColor: activeMethod.themeBg, borderWidth: 1, borderColor: activeMethod.themeColor }]}>
+              <Text style={[styles.categoryBadgeText, { color: activeMethod.themeColor }]}>{activeMethod.category}</Text>
             </View>
           </View>
 
-          <View style={styles.accountRow}>
-            <Text style={styles.accountLabel}>Account Number / Phone:</Text>
-            <Text selectable style={styles.accountValueBold}>
-              {activeMethod.accountNumber}
-            </Text>
-          </View>
+          {/* Copyable Account Number */}
+          <TouchableOpacity
+            activeOpacity={0.6}
+            onPress={() => handleCopy(activeMethod.accountNumber, "accountNumber")}
+            style={styles.copyableRow}
+          >
+            <View style={styles.copyableRowLeft}>
+              <Text style={styles.accountLabel}>Account Number / Phone:</Text>
+              <Text selectable style={styles.accountValueBold}>
+                {activeMethod.accountNumber}
+              </Text>
+            </View>
+            <View style={[
+              styles.copyBtn,
+              copiedField === "accountNumber" && styles.copyBtnCopied
+            ]}>
+              <Icon
+                name={copiedField === "accountNumber" ? "checkmark-circle" : "copy-outline"}
+                size={14}
+                color={copiedField === "accountNumber" ? COLORS.success : activeMethod.themeColor}
+              />
+              <Text style={[
+                styles.copyBtnText,
+                { color: copiedField === "accountNumber" ? COLORS.success : activeMethod.themeColor }
+              ]}>
+                {copiedField === "accountNumber" ? "Copied!" : "Copy"}
+              </Text>
+            </View>
+          </TouchableOpacity>
 
-          <View style={styles.accountRow}>
-            <Text style={styles.accountLabel}>Account Name:</Text>
-            <Text style={styles.accountValue}>{activeMethod.accountName}</Text>
-          </View>
+          {/* Copyable Account Name */}
+          <TouchableOpacity
+            activeOpacity={0.6}
+            onPress={() => handleCopy(activeMethod.accountName, "accountName")}
+            style={styles.copyableRow}
+          >
+            <View style={styles.copyableRowLeft}>
+              <Text style={styles.accountLabel}>Account Name:</Text>
+              <Text style={styles.accountValue}>{activeMethod.accountName}</Text>
+            </View>
+            <View style={[
+              styles.copyBtn,
+              copiedField === "accountName" && styles.copyBtnCopied
+            ]}>
+              <Icon
+                name={copiedField === "accountName" ? "checkmark-circle" : "copy-outline"}
+                size={14}
+                color={copiedField === "accountName" ? COLORS.success : activeMethod.themeColor}
+              />
+              <Text style={[
+                styles.copyBtnText,
+                { color: copiedField === "accountName" ? COLORS.success : activeMethod.themeColor }
+              ]}>
+                {copiedField === "accountName" ? "Copied!" : "Copy"}
+              </Text>
+            </View>
+          </TouchableOpacity>
 
-          <View style={styles.accountRow}>
-            <Text style={styles.accountLabel}>Amount to Pay:</Text>
-            <Text style={styles.accountAmount}>200 ETB</Text>
-          </View>
+          {/* Copyable Amount */}
+          <TouchableOpacity
+            activeOpacity={0.6}
+            onPress={() => handleCopy("200", "amount")}
+            style={styles.copyableRow}
+          >
+            <View style={styles.copyableRowLeft}>
+              <Text style={styles.accountLabel}>Amount to Pay:</Text>
+              <Text style={styles.accountAmount}>200 ETB</Text>
+            </View>
+            <View style={[
+              styles.copyBtn,
+              copiedField === "amount" && styles.copyBtnCopied
+            ]}>
+              <Icon
+                name={copiedField === "amount" ? "checkmark-circle" : "copy-outline"}
+                size={14}
+                color={copiedField === "amount" ? COLORS.success : activeMethod.themeColor}
+              />
+              <Text style={[
+                styles.copyBtnText,
+                { color: copiedField === "amount" ? COLORS.success : activeMethod.themeColor }
+              ]}>
+                {copiedField === "amount" ? "Copied!" : "Copy"}
+              </Text>
+            </View>
+          </TouchableOpacity>
         </Card>
       </View>
 
@@ -282,7 +416,7 @@ export function PaymentScreen({ payments = [], onSubmitPayment, submitting, user
         </View>
 
         <Text style={styles.stepDesc}>
-          Verify your payment using Method A (Transaction Info) OR Method B (Receipt Screenshot):
+          Verify your payment using <Text style={{ fontWeight: "800", color: "#2563eb" }}>Method A</Text> (Transaction Info) OR <Text style={{ fontWeight: "800", color: "#d97706" }}>Method B</Text> (Receipt Screenshot):
         </Text>
 
         <Notice message={error} type="error" />
@@ -294,16 +428,32 @@ export function PaymentScreen({ payments = [], onSubmitPayment, submitting, user
             onPress={() => setVerificationMode("details")}
             style={[
               styles.methodTab,
-              verificationMode === "details" && styles.activeMethodTab
+              verificationMode === "details" && styles.activeMethodTabA
             ]}
           >
+            <View style={styles.methodTabInner}>
+              <Icon
+                name="document-text-outline"
+                size={16}
+                color={verificationMode === "details" ? "#ffffff" : "#2563eb"}
+              />
+              <Text
+                style={[
+                  styles.methodTabText,
+                  { color: "#2563eb" },
+                  verificationMode === "details" && styles.activeMethodTabTextA
+                ]}
+              >
+                Method A
+              </Text>
+            </View>
             <Text
               style={[
-                styles.methodTabText,
-                verificationMode === "details" && styles.activeMethodTabText
+                styles.methodTabSubText,
+                verificationMode === "details" && { color: "rgba(255,255,255,0.85)" }
               ]}
             >
-              Method A: Transaction Info
+              Transaction Info
             </Text>
           </TouchableOpacity>
 
@@ -311,16 +461,32 @@ export function PaymentScreen({ payments = [], onSubmitPayment, submitting, user
             onPress={() => setVerificationMode("screenshot")}
             style={[
               styles.methodTab,
-              verificationMode === "screenshot" && styles.activeMethodTab
+              verificationMode === "screenshot" && styles.activeMethodTabB
             ]}
           >
+            <View style={styles.methodTabInner}>
+              <Icon
+                name="camera-outline"
+                size={16}
+                color={verificationMode === "screenshot" ? "#ffffff" : "#d97706"}
+              />
+              <Text
+                style={[
+                  styles.methodTabText,
+                  { color: "#d97706" },
+                  verificationMode === "screenshot" && styles.activeMethodTabTextB
+                ]}
+              >
+                Method B
+              </Text>
+            </View>
             <Text
               style={[
-                styles.methodTabText,
-                verificationMode === "screenshot" && styles.activeMethodTabText
+                styles.methodTabSubText,
+                verificationMode === "screenshot" && { color: "rgba(255,255,255,0.85)" }
               ]}
             >
-              Method B: Receipt Screenshot
+              Receipt Screenshot
             </Text>
           </TouchableOpacity>
         </View>
@@ -616,21 +782,41 @@ const styles = StyleSheet.create({
   providerGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: SPACING.xs,
+    gap: SPACING.sm,
     marginBottom: SPACING.md
   },
   providerTab: {
     backgroundColor: COLORS.surface,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: COLORS.border,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.md
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    minWidth: 95
+  },
+  providerTabInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
+  providerIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center"
   },
   providerTabText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "800",
     color: COLORS.textMuted
+  },
+  providerSelectedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 4
   },
   accountCard: {
     backgroundColor: COLORS.surface,
@@ -646,35 +832,79 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border
   },
+  accountHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    flexShrink: 1
+  },
+  accountIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   accountMethodName: {
-    fontSize: 16,
-    fontWeight: "800"
+    fontSize: 15,
+    fontWeight: "900",
+    flexShrink: 1
   },
   categoryBadge: {
-    backgroundColor: COLORS.surfaceMuted,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
     borderRadius: RADIUS.full
   },
   categoryBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: COLORS.textMuted
+    fontSize: 10,
+    fontWeight: "800"
   },
-  accountRow: {
+  copyableRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: SPACING.sm
+    marginBottom: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderStyle: "dashed"
+  },
+  copyableRowLeft: {
+    flexShrink: 1
+  },
+  copyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border
+  },
+  copyBtnCopied: {
+    backgroundColor: COLORS.successBg,
+    borderColor: COLORS.success
+  },
+  copyBtnText: {
+    fontSize: 11,
+    fontWeight: "800"
   },
   accountLabel: {
-    fontSize: 13,
-    color: COLORS.textMuted
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.textMuted,
+    marginBottom: 2
   },
   accountValueBold: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "900",
-    color: COLORS.primary
+    color: COLORS.primary,
+    letterSpacing: 0.5
   },
   accountValue: {
     fontSize: 14,
@@ -690,27 +920,59 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.md,
-    padding: 3,
+    padding: 4,
     marginBottom: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    gap: 4
   },
   methodTab: {
     flex: 1,
     paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.xs,
     alignItems: "center",
-    borderRadius: RADIUS.sm
+    borderRadius: RADIUS.sm,
+    borderWidth: 1.5,
+    borderColor: "transparent"
   },
-  activeMethodTab: {
-    backgroundColor: COLORS.primary
+  methodTabInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5
+  },
+  activeMethodTabA: {
+    backgroundColor: "#2563eb",
+    borderColor: "#1d4ed8",
+    shadowColor: "#2563eb",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3
+  },
+  activeMethodTabB: {
+    backgroundColor: "#d97706",
+    borderColor: "#b45309",
+    shadowColor: "#d97706",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3
   },
   methodTabText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: COLORS.textMuted
+    fontSize: 13,
+    fontWeight: "900"
   },
-  activeMethodTabText: {
-    color: COLORS.onPrimary
+  methodTabSubText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: COLORS.textMuted,
+    marginTop: 1
+  },
+  activeMethodTabTextA: {
+    color: "#ffffff"
+  },
+  activeMethodTabTextB: {
+    color: "#ffffff"
   },
   formCard: {
     backgroundColor: COLORS.surface

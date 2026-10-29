@@ -4,7 +4,7 @@ import { Subject } from "../models/Subject.js";
 
 export async function getSubjects(request, response) {
   try {
-    const canManage = ["admin", "content_manager"].includes(request.user?.role);
+    const canManage = ["admin", "teacher", "content_manager"].includes(request.user?.role);
     const filter = request.query.includeInactive === "true" && canManage ? {} : { isActive: true };
     if (request.query.stream && ["natural", "social"].includes(request.query.stream)) {
       filter.$or = [{ stream: request.query.stream }, { stream: "both" }];
@@ -104,7 +104,7 @@ export async function reactivateSubject(request, response) {
 export async function getChaptersBySubject(request, response) {
   try {
     const { subjectId } = request.params;
-    const canManage = ["admin", "content_manager"].includes(request.user?.role);
+    const canManage = ["admin", "teacher", "content_manager"].includes(request.user?.role);
     const filter = { subjectId };
     if (!(request.query.includeInactive === "true" && canManage)) filter.isActive = true;
     const chapters = await Chapter.find(filter).sort({ order: 1, title: 1 });
@@ -196,7 +196,7 @@ export async function reactivateChapter(request, response) {
 export async function getQuestions(request, response) {
   try {
     const { subjectId, chapterId } = request.query;
-    const canManage = ["admin", "content_manager"].includes(request.user?.role);
+    const canManage = ["admin", "teacher", "content_manager"].includes(request.user?.role);
     const filter = request.query.includeInactive === "true" && canManage ? {} : { isActive: true };
 
     if (subjectId) filter.subjectId = subjectId;

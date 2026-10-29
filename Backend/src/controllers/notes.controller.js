@@ -6,7 +6,7 @@ import { SyncChange } from "../models/SyncChange.js";
 export async function listNotes(request, response) {
   try {
     const filter = { status: { $ne: "deleted" } };
-    const isStaff = ["admin", "content_manager"].includes(request.user?.role);
+    const isStaff = ["admin", "teacher", "content_manager"].includes(request.user?.role);
 
     if (request.query.subjectId) filter.subjectId = request.query.subjectId;
     if (request.query.chapterId) filter.chapterId = request.query.chapterId;
@@ -55,7 +55,7 @@ export async function createNote(request, response) {
       return response.status(400).json({ error: "Title and content (or file URL) are required." });
     }
 
-    const isStaff = ["admin", "content_manager"].includes(request.user?.role);
+    const isStaff = ["admin", "teacher", "content_manager"].includes(request.user?.role);
     const resolvedChapter = chapterId || topicId;
 
     const note = await Note.create({
@@ -85,13 +85,29 @@ export async function createNote(request, response) {
 export async function updateNote(request, response) {
   try {
     const { id } = request.params;
-    const note = await Note.findOne({ _id: id, userId: request.user._id });
+    const isStaffLead = ["admin", "content_manager"].includes(request.user?.role);
+    const query = isStaffLead ? { _id: id } : { _id: id, userId: request.user._id };
+    const note = await Note.findOne(query);
 
     if (!note) {
       return response.status(404).json({ error: "Note not found." });
     }
 
-    const fields = ["title", "body", "subjectId", "chapterId", "questionId", "color", "status", "syncVersion", "lastSyncedAt"];
+    const fields = [
+      "title",
+      "body",
+      "subjectId",
+      "chapterId",
+      "questionId",
+      "fileType",
+      "fileUrl",
+      "isPublic",
+      "isPremium",
+      "color",
+      "status",
+      "syncVersion",
+      "lastSyncedAt"
+    ];
     for (const field of fields) {
       if (request.body[field] !== undefined) {
         note[field] = request.body[field];
@@ -109,7 +125,9 @@ export async function updateNote(request, response) {
 export async function deleteNote(request, response) {
   try {
     const { id } = request.params;
-    const note = await Note.findOne({ _id: id, userId: request.user._id });
+    const isStaffLead = ["admin", "content_manager"].includes(request.user?.role);
+    const query = isStaffLead ? { _id: id } : { _id: id, userId: request.user._id };
+    const note = await Note.findOne(query);
 
     if (!note) {
       return response.status(404).json({ error: "Note not found." });

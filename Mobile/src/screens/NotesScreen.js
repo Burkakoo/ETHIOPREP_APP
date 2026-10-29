@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "../components/Button.js";
 import { Card } from "../components/Card.js";
 import { Input } from "../components/Input.js";
@@ -11,6 +12,7 @@ import { COLORS, RADIUS, SPACING } from "../utils/theme.js";
 export function NotesScreen({ notes = [], onSaveNote, saving, user }) {
   const [activeTab, setActiveTab] = useState("materials"); // "materials" | "personal"
   const [showForm, setShowForm] = useState(false);
+  const [selectedMaterial, setSelectedMaterial] = useState(null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
@@ -112,24 +114,38 @@ export function NotesScreen({ notes = [], onSaveNote, saving, user }) {
           materials.map((m) => {
             const fileType = (m.fileType || "pdf").toUpperCase();
             return (
-              <Card key={m._id || m.localId} style={styles.noteCard}>
-                <View style={styles.noteHeader}>
-                  <View style={styles.badgeRow}>
-                    <View style={styles.formatBadge}>
-                      <Text style={styles.formatBadgeText}>{fileType}</Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                key={m._id || m.localId}
+                onPress={() => setSelectedMaterial(m)}
+              >
+                <Card style={styles.noteCard}>
+                  <View style={styles.noteHeader}>
+                    <View style={styles.badgeRow}>
+                      <View style={styles.formatBadge}>
+                        <Text style={styles.formatBadgeText}>{fileType}</Text>
+                      </View>
+                      <Text style={styles.subjectText}>{m.subjectId?.name || "General"}</Text>
+                      {m.chapterId?.title ? (
+                        <Text style={styles.chapterBadgeText}>• {m.chapterId.title}</Text>
+                      ) : null}
                     </View>
-                    <Text style={styles.subjectText}>{m.subjectId?.name || "General"}</Text>
+                    <Icon color={COLORS.primary} name="chevron-forward" size={16} />
                   </View>
-                </View>
-                <Text style={styles.noteTitle}>{m.title}</Text>
-                {m.body ? <Text style={styles.noteBody}>{m.body}</Text> : null}
-                {m.fileUrl ? (
-                  <View style={styles.downloadRow}>
-                    <Text style={styles.downloadLinkText}><Icon color={COLORS.primary} name="cloud-download-outline" size={14} />{" "}
-                      Available for offline study ({fileType})</Text>
+                  <Text style={styles.noteTitle}>{m.title}</Text>
+                  {m.body ? (
+                    <Text numberOfLines={3} style={styles.noteBody}>
+                      {m.body}
+                    </Text>
+                  ) : null}
+                  <View style={styles.protectedRow}>
+                    <Icon color={COLORS.primaryDark} name="shield-checkmark-outline" size={13} />
+                    <Text style={styles.protectedText}>
+                      Protected In-App Content · Tap to Read Offline
+                    </Text>
                   </View>
-                ) : null}
-              </Card>
+                </Card>
+              </TouchableOpacity>
             );
           })
         )
@@ -185,6 +201,75 @@ export function NotesScreen({ notes = [], onSaveNote, saving, user }) {
           )}
         </>
       )}
+      {/* ── Protected Offline In-App Reader Modal ── */}
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setSelectedMaterial(null)}
+        visible={Boolean(selectedMaterial)}
+      >
+        <SafeAreaView style={styles.readerContainer}>
+          {/* Reader Top Bar */}
+          <View style={styles.readerHeader}>
+            <TouchableOpacity
+              onPress={() => setSelectedMaterial(null)}
+              style={styles.readerBackBtn}
+            >
+              <Icon color={COLORS.primary} name="arrow-back" size={20} />
+              <Text style={styles.readerBackText}>Close</Text>
+            </TouchableOpacity>
+            <View style={styles.offlineProtectedBadge}>
+              <Icon color={COLORS.onPrimary} name="lock-closed" size={11} />
+              <Text style={styles.offlineProtectedBadgeText}>Protected Offline Reader</Text>
+            </View>
+          </View>
+
+          {selectedMaterial ? (
+            <ScrollView
+              contentContainerStyle={styles.readerContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.badgeRow}>
+                <View style={styles.formatBadge}>
+                  <Text style={styles.formatBadgeText}>
+                    {(selectedMaterial.fileType || "pdf").toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={styles.subjectText}>
+                  {selectedMaterial.subjectId?.name || "General Subject"}
+                </Text>
+                {selectedMaterial.chapterId?.title ? (
+                  <Text style={styles.chapterBadgeText}>
+                    • {selectedMaterial.chapterId.title}
+                  </Text>
+                ) : null}
+              </View>
+
+              <Text style={styles.readerTitle}>{selectedMaterial.title}</Text>
+
+              {/* Security Banner */}
+              <View style={styles.securityBanner}>
+                <Icon color={COLORS.primary} name="shield-outline" size={16} />
+                <Text style={styles.securityBannerText}>
+                  Available offline inside EthioPrep. External downloading, file export, and sharing are restricted to protect educational materials.
+                </Text>
+              </View>
+
+              {/* Full Text Content Body */}
+              <View style={styles.readerBodyContainer}>
+                <Text style={styles.readerBodyText}>
+                  {selectedMaterial.body || "No text summary provided for this material."}
+                </Text>
+              </View>
+
+              {selectedMaterial.uploadedBy?.displayName ? (
+                <Text style={styles.readerAuthor}>
+                  Published by: {selectedMaterial.uploadedBy.displayName}
+                </Text>
+              ) : null}
+            </ScrollView>
+          ) : null}
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 }
@@ -273,6 +358,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.textMuted
   },
+  chapterBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.primaryDark
+  },
   noteTitle: {
     fontSize: 16,
     fontWeight: "800",
@@ -288,21 +378,115 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     lineHeight: 20
   },
-  downloadRow: {
-    marginTop: 8,
+  protectedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: COLORS.border
   },
-  downloadLinkText: {
-    fontSize: 12,
+  protectedText: {
+    fontSize: 11.5,
     fontWeight: "700",
-    color: COLORS.primary
+    color: COLORS.primaryDark
   },
   emptyText: {
     textAlign: "center",
     color: COLORS.textMuted,
     paddingVertical: SPACING.lg,
     lineHeight: 20
+  },
+
+  /* ── Reader Modal Styles ── */
+  readerContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background
+  },
+  readerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.surface
+  },
+  readerBackBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 4
+  },
+  readerBackText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.primary
+  },
+  offlineProtectedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: RADIUS.full
+  },
+  offlineProtectedBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: COLORS.onPrimary
+  },
+  readerContent: {
+    padding: SPACING.lg,
+    paddingBottom: SPACING.xxl || 40
+  },
+  readerTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: COLORS.text,
+    lineHeight: 28,
+    marginVertical: SPACING.sm
+  },
+  securityBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: COLORS.primaryBg,
+    borderColor: COLORS.primaryLight || COLORS.border,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    padding: SPACING.sm,
+    marginVertical: SPACING.md
+  },
+  securityBannerText: {
+    flex: 1,
+    fontSize: 11.5,
+    color: COLORS.primaryDark,
+    lineHeight: 16,
+    fontWeight: "600"
+  },
+  readerBodyContainer: {
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    marginVertical: SPACING.sm
+  },
+  readerBodyText: {
+    fontSize: 15,
+    color: COLORS.text,
+    lineHeight: 24
+  },
+  readerAuthor: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontStyle: "italic",
+    marginTop: SPACING.md,
+    textAlign: "right"
   }
 });

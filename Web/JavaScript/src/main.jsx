@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
+  ArrowLeftIcon,
   BarChart3Icon,
   BookMarkedIcon,
   BookOpenIcon,
@@ -19,6 +20,7 @@ import {
   FolderOpenIcon,
   HourglassIcon,
   ImageIcon,
+  KeyRoundIcon,
   LayoutDashboardIcon,
   Loader2Icon,
   LockIcon,
@@ -40,25 +42,32 @@ import { apiRequest, clearSession, saveSession } from "./services/api.js";
 import { ROLE_LABELS, roleBadge, statusBadge } from "./components/Badge.jsx";
 import { SkeletonStats, SkeletonTable } from "./components/Spinner.jsx";
 import { Notice } from "./components/Notice.jsx";
+import { Modal } from "./components/Modal.jsx";
 import { fmtDate, getGreeting } from "./utils/helpers.js";
 import "../../CSS/styles.css";
 
-const STAFF_ROLES = ["admin", "content_manager", "cash_manager"];
+const STAFF_ROLES = ["admin", "teacher", "content_manager", "cash_manager"];
 
 /* ════════════════════════════════════════════════════════════════
    AUTH
    ════════════════════════════════════════════════════════════════ */
 
 function Auth({ onLogin }) {
+  const [step, setStep] = useState("login"); // "login" | "verify"
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+  const [verifyEmail, setVerifyEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [infoMsg, setInfoMsg] = useState("");
   const [error, setError] = useState("");
   const [studentNotice, setStudentNotice] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
 
   async function submitLogin(e) {
     e.preventDefault();
     setError("");
+    setInfoMsg("");
     setStudentNotice(false);
     setLoading(true);
     try {
@@ -75,9 +84,60 @@ function Auth({ onLogin }) {
       saveSession(result);
       onLogin(result.user);
     } catch (err) {
+      if (err.requiresVerification) {
+        setVerifyEmail(err.email || loginForm.email);
+        setStep("verify");
+        setInfoMsg("Your account email is not verified yet. A 6-digit verification code was sent to your inbox.");
+      } else {
+        setError(err.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitVerifyOTP(e) {
+    e.preventDefault();
+    setError("");
+    setInfoMsg("");
+    setLoading(true);
+    try {
+      const result = await apiRequest("/auth/verify-email", {
+        method: "POST",
+        body: JSON.stringify({ email: verifyEmail, otp: otp.trim() })
+      });
+
+      if (result.user.role === "student") {
+        clearSession();
+        setStudentNotice(true);
+        setStep("login");
+        setError("Student accounts must use the EthioPrep Mobile Application.");
+        return;
+      }
+
+      saveSession(result);
+      onLogin(result.user);
+    } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function resendOTP() {
+    setError("");
+    setInfoMsg("");
+    setResending(true);
+    try {
+      const res = await apiRequest("/auth/resend-verification", {
+        method: "POST",
+        body: JSON.stringify({ email: verifyEmail })
+      });
+      setInfoMsg(res.message || "A new 6-digit code has been sent to your email inbox.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setResending(false);
     }
   }
 
@@ -108,61 +168,137 @@ function Auth({ onLogin }) {
           This portal is reserved for <strong>Administrators</strong>, <strong>Content Managers</strong>, and <strong>Cash Managers</strong>.
         </div>
 
-        <h1>Staff Sign In</h1>
-        <p className="subtitle">Sign in to manage curriculum, exams, materials, and finances.</p>
+        {step === "login" ? (
+          <>
+            <h1>Staff Sign In</h1>
+            <p className="subtitle">Sign in to manage curriculum, exams, materials, and finances.</p>
 
-        {error && (
-          <div className="auth-error" role="alert">
-            {studentNotice ? <SmartphoneIcon size={18} className="auth-error-icon" /> : <CircleAlertIcon size={18} className="auth-error-icon" />}
-            <span>{error}</span>
-          </div>
+            {error && (
+              <div className="auth-error" role="alert">
+                {studentNotice ? <SmartphoneIcon size={18} className="auth-error-icon" /> : <CircleAlertIcon size={18} className="auth-error-icon" />}
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={submitLogin}>
+              <div className="field">
+                <label htmlFor="auth-email">Staff Email address</label>
+                <div className="input-with-icon">
+                <MailIcon size={16} className="input-icon" aria-hidden="true" />
+                <input
+                  id="auth-email"
+                  autoComplete="email"
+                  type="email"
+                  required
+                  placeholder="admin@ethioprep.com"
+                  value={loginForm.email}
+                  onChange={e => setLoginForm({ ...loginForm, email: e.target.value })}
+                />
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="auth-password">Password</label>
+                <div className="input-with-icon">
+                <LockIcon size={16} className="input-icon" aria-hidden="true" />
+                <input
+                  id="auth-password"
+                  autoComplete="current-password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  placeholder="••••••••"
+                  value={loginForm.password}
+                  onChange={e => setLoginForm({ ...loginForm, password: e.target.value })}
+                />
+                <button
+                  type="button"
+                  className="input-action"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowPassword(v => !v)}
+                >
+                  {showPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                </button>
+                </div>
+              </div>
+              <button type="submit" className="btn btn-primary btn-full" disabled={loading} style={{ marginTop: 8 }}>
+                {loading
+                  ? <><Loader2Icon size={16} className="spin" /> Authenticating…</>
+                  : <><LogInIcon size={16} /> Sign In to Management Portal</>}
+              </button>
+            </form>
+          </>
+        ) : (
+          <>
+            <h1>Verify Staff Email</h1>
+            <p className="subtitle">Enter the 6-digit OTP code sent to <strong>{verifyEmail}</strong></p>
+
+            {infoMsg && (
+              <div style={{
+                background: "rgba(16, 185, 129, 0.1)",
+                border: "1px solid rgba(16, 185, 129, 0.3)",
+                color: "#10b981",
+                borderRadius: "var(--r-md)",
+                padding: "10px 14px",
+                fontSize: 13,
+                marginBottom: 16
+              }}>
+                {infoMsg}
+              </div>
+            )}
+
+            {error && (
+              <div className="auth-error" role="alert">
+                <CircleAlertIcon size={18} className="auth-error-icon" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={submitVerifyOTP}>
+              <div className="field">
+                <label htmlFor="auth-otp">6-Digit Verification Code</label>
+                <div className="input-with-icon">
+                  <KeyRoundIcon size={16} className="input-icon" aria-hidden="true" />
+                  <input
+                    id="auth-otp"
+                    type="text"
+                    maxLength={6}
+                    required
+                    autoFocus
+                    placeholder="123456"
+                    value={otp}
+                    onChange={e => setOtp(e.target.value.replace(/\D/g, ""))}
+                    style={{ letterSpacing: "4px", fontSize: 18, fontWeight: 700 }}
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="btn btn-primary btn-full"
+                disabled={loading || otp.length < 6}
+                style={{ marginTop: 8 }}
+              >
+                {loading ? <><Loader2Icon size={16} className="spin" /> Verifying…</> : <><CheckIcon size={16} /> Verify &amp; Sign In</>}
+              </button>
+            </form>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={() => { setStep("login"); setError(""); setInfoMsg(""); }}
+              >
+                <ArrowLeftIcon size={14} /> Back to Sign In
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onClick={resendOTP}
+                disabled={resending}
+              >
+                {resending ? "Sending…" : "Resend Code"}
+              </button>
+            </div>
+          </>
         )}
-
-        <form onSubmit={submitLogin}>
-          <div className="field">
-            <label htmlFor="auth-email">Staff Email address</label>
-            <div className="input-with-icon">
-            <MailIcon size={16} className="input-icon" aria-hidden="true" />
-            <input
-              id="auth-email"
-              autoComplete="email"
-              type="email"
-              required
-              placeholder="admin@ethioprep.com"
-              value={loginForm.email}
-              onChange={e => setLoginForm({ ...loginForm, email: e.target.value })}
-            />
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="auth-password">Password</label>
-            <div className="input-with-icon">
-            <LockIcon size={16} className="input-icon" aria-hidden="true" />
-            <input
-              id="auth-password"
-              autoComplete="current-password"
-              type={showPassword ? "text" : "password"}
-              required
-              placeholder="••••••••"
-              value={loginForm.password}
-              onChange={e => setLoginForm({ ...loginForm, password: e.target.value })}
-            />
-            <button
-              type="button"
-              className="input-action"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              onClick={() => setShowPassword(v => !v)}
-            >
-              {showPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
-            </button>
-            </div>
-          </div>
-          <button type="submit" className="btn btn-primary btn-full" disabled={loading} style={{ marginTop: 8 }}>
-            {loading
-              ? <><Loader2Icon size={16} className="spin" /> Authenticating…</>
-              : <><LogInIcon size={16} /> Sign In to Management Portal</>}
-          </button>
-        </form>
 
         <div style={{
           marginTop: 24,
@@ -222,9 +358,9 @@ function Overview({ user, stats }) {
               <thead><tr><th>Capability</th><th>Access</th></tr></thead>
               <tbody>
                 {[
-                  ["Manage Subjects & Chapters", ["admin", "content_manager"]],
-                  ["Create & Publish Exams", ["admin", "content_manager"]],
-                  ["Manage Question Bank", ["admin", "content_manager"]],
+                  ["Manage Subjects & Chapters", ["admin", "teacher", "content_manager"]],
+                  ["Create & Publish Exams", ["admin", "teacher", "content_manager"]],
+                  ["Manage Question Bank", ["admin", "teacher", "content_manager"]],
                   ["Verify Payments", ["admin", "cash_manager"]],
                   ["View Analytics", ["admin"]],
                   ["Manage All Users", ["admin"]],
@@ -307,7 +443,7 @@ function SubjectsPage({ user }) {
     } catch (err) { setMsg({ text: err.message, type: "error" }); }
   }
 
-  const canManage = ["admin", "content_manager"].includes(user.role);
+  const canManage = ["admin", "teacher", "content_manager"].includes(user.role);
 
   return (
     <>
@@ -420,7 +556,7 @@ function QuestionsPage({ user }) {
     options: ["", "", "", ""],
   });
   const [chapters, setChapters] = useState([]);
-  const canManage = ["admin", "content_manager"].includes(user.role);
+  const canManage = ["admin", "teacher", "content_manager"].includes(user.role);
 
   useEffect(() => {
     apiRequest("/question-bank/subjects?includeInactive=true").then(r => setSubjects(r.subjects)).catch(() => {});
@@ -695,10 +831,10 @@ function ExamsPage({ user }) {
   const [editingExam, setEditingExam] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    title: "", description: "", subjectId: "", durationMinutes: 60,
+    title: "", description: "", subjectId: "", examYear: "", durationMinutes: 60,
     passingScore: 50, accessLevel: "free", questionIds: [],
   });
-  const canManage = ["admin", "content_manager"].includes(user.role);
+  const canManage = ["admin", "teacher", "content_manager"].includes(user.role);
 
   useEffect(() => {
     apiRequest("/question-bank/subjects").then(r => setSubjects(r.subjects)).catch(() => {});
@@ -726,11 +862,11 @@ function ExamsPage({ user }) {
     if (form.questionIds.length === 0) { setMsg({ text: "Select at least one question.", type: "error" }); return; }
     setSaving(true);
     try {
-      await apiRequest(editingExam ? `/exams/${editingExam._id}` : "/exams", { method: editingExam ? "PATCH" : "POST", body: JSON.stringify({ ...form, durationMinutes: Number(form.durationMinutes), passingScore: Number(form.passingScore) }) });
+      await apiRequest(editingExam ? `/exams/${editingExam._id}` : "/exams", { method: editingExam ? "PATCH" : "POST", body: JSON.stringify({ ...form, examYear: Number(form.examYear), durationMinutes: Number(form.durationMinutes), passingScore: Number(form.passingScore) }) });
       setMsg({ text: editingExam ? "Exam updated." : "Exam created as draft.", type: "success" });
       setShowModal(false);
       setEditingExam(null);
-      setForm({ title: "", description: "", subjectId: "", durationMinutes: 60, passingScore: 50, accessLevel: "free", questionIds: [] });
+      setForm({ title: "", description: "", subjectId: "", examYear: "", durationMinutes: 60, passingScore: 50, accessLevel: "free", questionIds: [] });
       load();
     } catch (err) { setMsg({ text: err.message, type: "error" }); }
     finally { setSaving(false); }
@@ -738,7 +874,8 @@ function ExamsPage({ user }) {
 
   function openEdit(exam) {
     setEditingExam(exam);
-    setForm({ title: exam.title, description: exam.description || "", subjectId: String(exam.subjectId?._id || exam.subjectId), durationMinutes: exam.durationMinutes, passingScore: exam.passingScore, accessLevel: exam.accessLevel, questionIds: (exam.questionIds || []).map(String) });
+    const titleYear = exam.title.match(/\b(?:19|20)\d{2}\b/)?.[0] || "";
+    setForm({ title: exam.title, description: exam.description || "", subjectId: String(exam.subjectId?._id || exam.subjectId), examYear: exam.examYear || titleYear, durationMinutes: exam.durationMinutes, passingScore: exam.passingScore, accessLevel: exam.accessLevel, questionIds: (exam.questionIds || []).map(String) });
     setShowModal(true);
   }
 
@@ -778,7 +915,7 @@ function ExamsPage({ user }) {
         <div className="breadcrumb"><span>Content</span><span className="sep">›</span><span>Exams</span></div>
         <div className="page-header-row">
           <div><h1>Exams</h1><p className="page-desc">Create, publish, and archive practice exams for students.</p></div>
-          {canManage && <button className="btn btn-primary" onClick={() => { setEditingExam(null); setForm({ title: "", description: "", subjectId: "", durationMinutes: 60, passingScore: 50, accessLevel: "free", questionIds: [] }); setShowModal(true); }}><PlusIcon size={16} /> New Exam</button>}
+          {canManage && <button className="btn btn-primary" onClick={() => { setEditingExam(null); setForm({ title: "", description: "", subjectId: "", examYear: "", durationMinutes: 60, passingScore: 50, accessLevel: "free", questionIds: [] }); setShowModal(true); }}><PlusIcon size={16} /> New Exam</button>}
         </div>
       </div>
       <div className="content-body">
@@ -789,14 +926,16 @@ function ExamsPage({ user }) {
             <div className="table-wrap">
               <table>
                 <thead>
-                  <tr><th>Title</th><th>Duration</th><th>Questions</th><th>Pass Score</th><th>Access</th><th>Status</th>{canManage && <th>Actions</th>}</tr>
+                  <tr><th>Title</th><th>Subject</th><th>Exam Year</th><th>Duration</th><th>Questions</th><th>Pass Score</th><th>Access</th><th>Status</th>{canManage && <th>Actions</th>}</tr>
                 </thead>
                 <tbody>
                   {exams.length === 0 ? (
-                    <tr><td colSpan={7}><div className="empty-state"><div className="empty-icon"><FileTextIcon size={26} strokeWidth={1.75} /></div><h3>No exams yet</h3><p>Create your first exam to make it available to students.</p></div></td></tr>
+                    <tr><td colSpan={9}><div className="empty-state"><div className="empty-icon"><FileTextIcon size={26} strokeWidth={1.75} /></div><h3>No exams yet</h3><p>Create your first exam to make it available to students.</p></div></td></tr>
                   ) : exams.map(ex => (
                     <tr key={ex._id}>
                       <td><strong>{ex.title}</strong><div className="td-muted" style={{ fontSize: 12, marginTop: 2 }}>{ex.description || ""}</div></td>
+                      <td className="td-muted">{ex.subjectId?.name || "—"}</td>
+                      <td><span className="badge badge-blue">{ex.examYear || "Legacy"}</span></td>
                       <td className="td-muted">{ex.durationMinutes} min</td>
                       <td className="td-muted">{ex.questionIds?.length || 0}</td>
                       <td className="td-muted">{ex.passingScore}%</td>
@@ -846,6 +985,7 @@ function ExamsPage({ user }) {
                         <option value="premium">Premium</option>
                       </select>
                     </div>
+                    <div className="field"><label>Exam Year *</label><input type="number" min="1900" max="3000" required placeholder="e.g. 2017" value={form.examYear} onChange={e => setForm({ ...form, examYear: e.target.value })} /></div>
                   </div>
                   <div className="form-row">
                     <div className="field"><label>Duration (minutes) *</label><input type="number" min="5" required value={form.durationMinutes} onChange={e => setForm({ ...form, durationMinutes: e.target.value })} /></div>
@@ -1110,6 +1250,7 @@ function StaffNotesPage({ user }) {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState({ text: "", type: "success" });
   const [showModal, setShowModal] = useState(false);
+  const [viewingNote, setViewingNote] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: "",
@@ -1118,10 +1259,11 @@ function StaffNotesPage({ user }) {
     fileType: "pdf",
     fileUrl: "",
     body: "",
-    isPublic: true
+    isPublic: true,
+    isPremium: false
   });
 
-  const canManage = ["admin", "content_manager"].includes(user.role);
+  const canManage = ["admin", "teacher", "content_manager"].includes(user.role);
 
   useEffect(() => {
     apiRequest("/question-bank/subjects").then(r => setSubjects(r.subjects || [])).catch(() => {});
@@ -1162,7 +1304,7 @@ function StaffNotesPage({ user }) {
       });
       setMsg({ text: "Educational study material created successfully.", type: "success" });
       setShowModal(false);
-      setForm({ title: "", subjectId: "", chapterId: "", fileType: "pdf", fileUrl: "", body: "", isPublic: true });
+      setForm({ title: "", subjectId: "", chapterId: "", fileType: "pdf", fileUrl: "", body: "", isPublic: true, isPremium: false });
       load();
     } catch (err) {
       setMsg({ text: err.message, type: "error" });
@@ -1189,7 +1331,7 @@ function StaffNotesPage({ user }) {
         <div className="page-header-row">
           <div>
             <h1>Educational Study Notes</h1>
-            <p className="page-desc">Upload PDFs, PowerPoint slides, Word documents, and syllabus summaries for students.</p>
+            <p className="page-desc">Teachers and content managers can publish PDF guides, slides, handouts, and concept summaries for students.</p>
           </div>
           {canManage && (
             <button className="btn btn-primary" onClick={() => setShowModal(true)}>
@@ -1225,17 +1367,21 @@ function StaffNotesPage({ user }) {
                     <th>Subject</th>
                     <th>Topic / Chapter</th>
                     <th>Format</th>
-                    <th>File / Link</th>
+                    <th>Uploaded By</th>
                     <th>Access</th>
+                    <th>File / Link</th>
                     {canManage && <th>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {notes.length === 0 ? (
-                    <tr><td colSpan={7}><div className="empty-state">No notes uploaded yet.</div></td></tr>
+                    <tr><td colSpan={8}><div className="empty-state">No notes uploaded yet.</div></td></tr>
                   ) : notes.map(n => (
                     <tr key={n._id}>
-                      <td><strong>{n.title}</strong></td>
+                      <td>
+                        <strong>{n.title}</strong>
+                        {n.body && <div className="td-muted" style={{ fontSize: 11, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.body}</div>}
+                      </td>
                       <td><span className="badge badge-info">{n.subjectId?.name || "—"}</span></td>
                       <td className="td-muted">{n.chapterId?.title || "—"}</td>
                       <td>
@@ -1243,23 +1389,36 @@ function StaffNotesPage({ user }) {
                           {(n.fileType || "pdf").toUpperCase()}
                         </span>
                       </td>
+                      <td><span className="td-muted">{n.uploadedBy?.displayName || "Teacher / Staff"}</span></td>
                       <td>
-                        {n.fileUrl ? (
-                          <a href={n.fileUrl} target="_blank" rel="noreferrer" style={{ color: "var(--green)", textDecoration: "underline" }}>
-                            <DownloadIcon size={14} /> View File
-                          </a>
-                        ) : (
-                          <span className="td-muted">Text Note</span>
-                        )}
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          <span className={`badge ${n.isPublic ? "badge-green" : "badge-gray"}`}>
+                            {n.isPublic ? "Public" : "Private"}
+                          </span>
+                          <span className={`badge ${n.isPremium ? "badge-amber" : "badge-gray"}`}>
+                            {n.isPremium ? "Premium" : "Free"}
+                          </span>
+                        </div>
                       </td>
                       <td>
-                        <span className={`badge ${n.isPublic ? "badge-green" : "badge-gray"}`}>
-                          {n.isPublic ? "Public" : "Private"}
-                        </span>
+                        {n.fileUrl ? (
+                          <a href={n.fileUrl} target="_blank" rel="noreferrer" style={{ color: "var(--primary-light)", textDecoration: "underline", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <DownloadIcon size={13} /> View Link
+                          </a>
+                        ) : (
+                          <span className="td-muted">In-App Text</span>
+                        )}
                       </td>
                       {canManage && (
                         <td>
-                          <button className="btn btn-sm btn-danger" onClick={() => deleteNote(n._id)}>Delete</button>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button className="btn btn-sm btn-secondary" onClick={() => setViewingNote(n)}>
+                              Read
+                            </button>
+                            <button className="btn btn-sm btn-danger" onClick={() => deleteNote(n._id)}>
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -1271,65 +1430,131 @@ function StaffNotesPage({ user }) {
         </div>
       </div>
 
-      {showModal && (
-        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
-          <div className="modal">
-            <div className="modal-header">
-              <h2>New Educational Note / Document</h2>
-              <button className="modal-close" onClick={() => setShowModal(false)} aria-label="Close"><XIcon size={18} /></button>
-            </div>
-            <form onSubmit={createNote}>
-              <div className="modal-body">
-                <div className="form-grid">
-                  <div className="field">
-                    <label>Title *</label>
-                    <input required placeholder="e.g. Newton's 3 Laws Summary" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
-                  </div>
-                  <div className="form-row">
-                    <div className="field">
-                      <label>Subject *</label>
-                      <select required value={form.subjectId} onChange={e => setForm({ ...form, subjectId: e.target.value })}>
-                        <option value="">— Select Subject —</option>
-                        {subjects.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="field">
-                      <label>Topic / Chapter</label>
-                      <select value={form.chapterId} onChange={e => setForm({ ...form, chapterId: e.target.value })}>
-                        <option value="">— General / Optional —</option>
-                        {chapters.map(c => <option key={c._id} value={c._id}>{c.title}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="form-row">
-                    <div className="field">
-                      <label>File Type *</label>
-                      <select value={form.fileType} onChange={e => setForm({ ...form, fileType: e.target.value })}>
-                        <option value="pdf">PDF Document (.pdf)</option>
-                        <option value="ppt">PowerPoint Presentation (.ppt, .pptx)</option>
-                        <option value="docx">Word Document (.doc, .docx)</option>
-                        <option value="text">Text Handout</option>
-                      </select>
-                    </div>
-                    <div className="field">
-                      <label>File URL / Cloudinary Link</label>
-                      <input placeholder="https://..." value={form.fileUrl} onChange={e => setForm({ ...form, fileUrl: e.target.value })} />
-                    </div>
-                  </div>
-                  <div className="field">
-                    <label>Overview / Key Concepts Summary</label>
-                    <textarea rows={4} placeholder="Summary of formulas, rules, and concepts…" value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} />
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : "Upload Note"}</button>
-              </div>
-            </form>
+      <Modal show={showModal} onClose={() => setShowModal(false)} title="Upload / Create Study Note">
+        <form onSubmit={createNote}>
+          <div className="field">
+            <label>Title *</label>
+            <input
+              required
+              placeholder="e.g. Grade 12 Physics: Electromagnetism Summary"
+              value={form.title}
+              onChange={e => setForm({ ...form, title: e.target.value })}
+            />
           </div>
-        </div>
-      )}
+
+          <div className="form-row">
+            <div className="field">
+              <label>Subject *</label>
+              <select required value={form.subjectId} onChange={e => setForm({ ...form, subjectId: e.target.value })}>
+                <option value="">— Select Subject —</option>
+                {subjects.map(s => <option key={s._id} value={s._id}>{s.name} ({s.code})</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label>Topic / Chapter</label>
+              <select value={form.chapterId} onChange={e => setForm({ ...form, chapterId: e.target.value })}>
+                <option value="">— General / Entire Subject —</option>
+                {chapters.map(c => <option key={c._id} value={c._id}>{c.title}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="field">
+              <label>Format</label>
+              <select value={form.fileType} onChange={e => setForm({ ...form, fileType: e.target.value })}>
+                <option value="pdf">PDF Document (.pdf)</option>
+                <option value="ppt">PowerPoint Presentation (.ppt, .pptx)</option>
+                <option value="docx">Word Document (.doc, .docx)</option>
+                <option value="text">Text Handout / Syllabus</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>Access Tier</label>
+              <select value={form.isPremium ? "premium" : "free"} onChange={e => setForm({ ...form, isPremium: e.target.value === "premium" })}>
+                <option value="free">Free for All Students</option>
+                <option value="premium">Premium Students Only</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="field">
+            <label>File URL / Cloud Link (Optional)</label>
+            <input
+              placeholder="https://drive.google.com/... or https://res.cloudinary.com/..."
+              value={form.fileUrl}
+              onChange={e => setForm({ ...form, fileUrl: e.target.value })}
+            />
+            <span style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3 }}>
+              Paste a link to Google Drive, Dropbox, OneDrive, Cloudinary, or any shared file.
+            </span>
+          </div>
+
+          <div className="field">
+            <label>Overview, Key Formulas &amp; Study Text *</label>
+            <textarea
+              rows={6}
+              placeholder="Write formulas, definitions, rules, and core concepts. Students can read this directly in the mobile app offline without downloading any external app..."
+              value={form.body}
+              onChange={e => setForm({ ...form, body: e.target.value })}
+            />
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? "Publishing…" : "Publish Study Note"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal show={Boolean(viewingNote)} onClose={() => setViewingNote(null)} title={viewingNote?.title || "Study Note"}>
+        {viewingNote && (
+          <div style={{ lineHeight: 1.6 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+              <span className="badge badge-info">{viewingNote.subjectId?.name || "General Subject"}</span>
+              {viewingNote.chapterId?.title && <span className="badge badge-gray">{viewingNote.chapterId.title}</span>}
+              <span className="badge badge-blue">{(viewingNote.fileType || "pdf").toUpperCase()}</span>
+              <span className={`badge ${viewingNote.isPremium ? "badge-amber" : "badge-green"}`}>{viewingNote.isPremium ? "Premium" : "Free"}</span>
+              <span className="badge badge-gray">By {viewingNote.uploadedBy?.displayName || "Teacher"}</span>
+            </div>
+
+            {viewingNote.fileUrl && (
+              <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--r-md)" }}>
+                <strong>Attached Document: </strong>
+                <a href={viewingNote.fileUrl} target="_blank" rel="noreferrer" style={{ color: "var(--primary-light)", textDecoration: "underline", marginLeft: 6 }}>
+                  Open / Download {viewingNote.fileType?.toUpperCase()}
+                </a>
+              </div>
+            )}
+
+            <div className="field">
+              <label>Study Material Content:</label>
+              <div style={{
+                background: "var(--bg-card)",
+                padding: 14,
+                borderRadius: "var(--r-md)",
+                border: "1px solid var(--border)",
+                whiteSpace: "pre-wrap",
+                fontSize: 13,
+                maxHeight: 350,
+                overflowY: "auto"
+              }}>
+                {viewingNote.body || "No text summary provided. Please use the attached link above."}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setViewingNote(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </>
   );
 }
@@ -1343,6 +1568,15 @@ function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState({ text: "", type: "success" });
   const [search, setSearch] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newStaff, setNewStaff] = useState({
+    displayName: "",
+    email: "",
+    password: "",
+    role: "content_manager",
+    phoneNumber: ""
+  });
+  const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1377,12 +1611,44 @@ function UsersPage() {
     try {
       await apiRequest(`/users/${userId}/status`, {
         method: "PATCH",
-        body: JSON.stringify({ status: nextStatus })
+        body: JSON.stringify({ status: nextStatus, emailVerified: nextStatus === "active" ? true : undefined })
       });
       setMsg({ text: `User marked as ${nextStatus}.`, type: "success" });
       load();
     } catch (err) {
       setMsg({ text: err.message, type: "error" });
+    }
+  }
+
+  async function verifyEmailManual(userId) {
+    try {
+      await apiRequest(`/users/${userId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ emailVerified: true, status: "active" })
+      });
+      setMsg({ text: "User email verified and account activated successfully.", type: "success" });
+      load();
+    } catch (err) {
+      setMsg({ text: err.message, type: "error" });
+    }
+  }
+
+  async function handleCreateStaff(e) {
+    e.preventDefault();
+    setCreating(true);
+    try {
+      await apiRequest("/users", {
+        method: "POST",
+        body: JSON.stringify(newStaff)
+      });
+      setMsg({ text: `Staff account created for ${newStaff.email} with verified access.`, type: "success" });
+      setShowAddModal(false);
+      setNewStaff({ displayName: "", email: "", password: "", role: "content_manager", phoneNumber: "" });
+      load();
+    } catch (err) {
+      setMsg({ text: err.message, type: "error" });
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -1393,15 +1659,18 @@ function UsersPage() {
         <div className="page-header-row">
           <div>
             <h1>User Account Management</h1>
-            <p className="page-desc">View registered students and staff, reassign roles, and manage access privileges.</p>
+            <p className="page-desc">View registered students and staff, verify emails, reassign roles, and manage access privileges.</p>
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <input
               placeholder="Search by name or email…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ width: 260 }}
+              style={{ width: 240 }}
             />
+            <button className="btn btn-primary" onClick={() => setShowAddModal(true)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <PlusIcon size={16} /> Add Staff Member
+            </button>
           </div>
         </div>
       </div>
@@ -1419,6 +1688,7 @@ function UsersPage() {
                     <th>Display Name</th>
                     <th>Email</th>
                     <th>Role</th>
+                    <th>Email Verified</th>
                     <th>Stream</th>
                     <th>Subscription</th>
                     <th>Status</th>
@@ -1427,7 +1697,7 @@ function UsersPage() {
                 </thead>
                 <tbody>
                   {users.length === 0 ? (
-                    <tr><td colSpan={7}><div className="empty-state">No users matching search.</div></td></tr>
+                    <tr><td colSpan={8}><div className="empty-state">No users matching search.</div></td></tr>
                   ) : users.map(u => (
                     <tr key={u._id}>
                       <td><strong>{u.displayName}</strong></td>
@@ -1439,10 +1709,22 @@ function UsersPage() {
                           style={{ padding: "4px 8px", fontSize: 12, borderRadius: 6 }}
                         >
                           <option value="student">Student</option>
+                          <option value="teacher">Teacher</option>
                           <option value="content_manager">Content Manager</option>
                           <option value="cash_manager">Cash Manager</option>
                           <option value="admin">Administrator</option>
                         </select>
+                      </td>
+                      <td>
+                        {u.emailVerified ? (
+                          <span className="badge badge-green" style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                            <CheckIcon size={12} /> Verified
+                          </span>
+                        ) : (
+                          <span className="badge badge-amber" style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                            <CircleAlertIcon size={12} /> Unverified
+                          </span>
+                        )}
                       </td>
                       <td>
                         <span className="badge badge-gray">{u.stream ? u.stream.toUpperCase() : "NATURAL"}</span>
@@ -1454,12 +1736,23 @@ function UsersPage() {
                       </td>
                       <td>{statusBadge(u.status)}</td>
                       <td>
-                        <button
-                          className={`btn btn-sm ${u.status === "active" ? "btn-secondary" : "btn-success"}`}
-                          onClick={() => toggleStatus(u._id, u.status)}
-                        >
-                          {u.status === "active" ? "Suspend" : "Activate"}
-                        </button>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {!u.emailVerified && (
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={() => verifyEmailManual(u._id)}
+                              title="Manually verify email and activate user"
+                            >
+                              Verify
+                            </button>
+                          )}
+                          <button
+                            className={`btn btn-sm ${u.status === "active" ? "btn-secondary" : "btn-success"}`}
+                            onClick={() => toggleStatus(u._id, u.status)}
+                          >
+                            {u.status === "active" ? "Suspend" : "Activate"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1469,6 +1762,69 @@ function UsersPage() {
           )}
         </div>
       </div>
+
+      <Modal show={showAddModal} onClose={() => setShowAddModal(false)} title="Register New Staff Member">
+        <form onSubmit={handleCreateStaff}>
+          <div className="field">
+            <label>Full Display Name</label>
+            <input
+              required
+              placeholder="e.g. Abebe Balcha"
+              value={newStaff.displayName}
+              onChange={e => setNewStaff({ ...newStaff, displayName: e.target.value })}
+            />
+          </div>
+          <div className="field">
+            <label>Email Address</label>
+            <input
+              type="email"
+              required
+              placeholder="e.g. staff@ethioprep.com"
+              value={newStaff.email}
+              onChange={e => setNewStaff({ ...newStaff, email: e.target.value })}
+            />
+          </div>
+          <div className="field">
+            <label>Temporary Password (min 8 characters)</label>
+            <input
+              type="password"
+              required
+              minLength={8}
+              placeholder="••••••••"
+              value={newStaff.password}
+              onChange={e => setNewStaff({ ...newStaff, password: e.target.value })}
+            />
+          </div>
+          <div className="field">
+            <label>Role</label>
+            <select
+              value={newStaff.role}
+              onChange={e => setNewStaff({ ...newStaff, role: e.target.value })}
+            >
+              <option value="content_manager">Content Manager (Curriculum &amp; Exams)</option>
+              <option value="cash_manager">Cash Manager (Payment Verification)</option>
+              <option value="admin">Administrator (Full Access)</option>
+              <option value="teacher">Teacher</option>
+            </select>
+          </div>
+          <div className="field">
+            <label>Phone Number (optional)</label>
+            <input
+              placeholder="+251 9..."
+              value={newStaff.phoneNumber}
+              onChange={e => setNewStaff({ ...newStaff, phoneNumber: e.target.value })}
+            />
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={creating}>
+              {creating ? "Creating…" : "Create & Activate Staff"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </>
   );
 }
@@ -1569,7 +1925,7 @@ function ChaptersPage({ user }) {
   const [editingChapter, setEditingChapter] = useState(null);
   const [form, setForm] = useState({ title: "", description: "", order: 1 });
   const [saving, setSaving] = useState(false);
-  const canManage = ["admin", "content_manager"].includes(user.role);
+  const canManage = ["admin", "teacher", "content_manager"].includes(user.role);
 
   useEffect(() => {
     apiRequest("/question-bank/subjects?includeInactive=true").then(r => setSubjects(r.subjects)).catch(() => {});
@@ -1723,7 +2079,7 @@ function Dashboard({ user, onLogout }) {
     });
   }, []);
 
-  const canContent = ["admin", "content_manager"].includes(user.role);
+  const canContent = ["admin", "teacher", "content_manager"].includes(user.role);
   const canFinance = ["admin", "cash_manager"].includes(user.role);
   const isAdmin = user.role === "admin";
 

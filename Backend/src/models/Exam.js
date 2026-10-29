@@ -24,6 +24,14 @@ const examSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    // Ethiopian exam year used by students to choose a past paper.
+    // Optional only for records created before this field existed.
+    examYear: {
+      type: Number,
+      min: 1900,
+      max: 3000,
+      index: true
+    },
     chapterIds: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: "Chapter"
@@ -72,6 +80,7 @@ const examSchema = new mongoose.Schema(
 );
 
 examSchema.index({ status: 1, accessLevel: 1, type: 1 });
+examSchema.index({ subjectId: 1, examYear: -1, status: 1 });
 examSchema.index({ createdAt: -1 });
 
 export const Exam = mongoose.model("Exam", examSchema);

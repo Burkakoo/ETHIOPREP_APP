@@ -1,7 +1,7 @@
 import { verifyToken } from "../config/jwt.js";
 import { User } from "../models/User.js";
 
-export const STAFF_ROLES = ["admin", "content_manager", "cash_manager"];
+export const STAFF_ROLES = ["admin", "teacher", "content_manager", "cash_manager"];
 
 export async function requireAuth(request, response, next) {
   try {

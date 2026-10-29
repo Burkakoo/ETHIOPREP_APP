@@ -32,6 +32,15 @@ export async function register({ email, password, displayName, phoneNumber, stre
     method: "POST",
     body: JSON.stringify({ email, password, displayName, phoneNumber, stream })
   });
+  // Don't store token on register — user must verify email first
+  return result;
+}
+
+export async function verifyEmail(email, otp) {
+  const result = await request("/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ email, otp })
+  });
   if (result.accessToken) {
     await AsyncStorage.setItem("ethioprep_token", result.accessToken);
   }
@@ -39,6 +48,34 @@ export async function register({ email, password, displayName, phoneNumber, stre
     await AsyncStorage.setItem("ethioprep_user", JSON.stringify(result.user));
   }
   return result;
+}
+
+export async function resendVerification(email) {
+  return await request("/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify({ email })
+  });
+}
+
+export async function forgotPassword(email) {
+  return await request("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email })
+  });
+}
+
+export async function verifyResetOTP(email, otp) {
+  return await request("/auth/verify-reset-otp", {
+    method: "POST",
+    body: JSON.stringify({ email, otp })
+  });
+}
+
+export async function resetPassword(email, otp, newPassword) {
+  return await request("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ email, otp, newPassword })
+  });
 }
 
 export async function updateStream(stream) {

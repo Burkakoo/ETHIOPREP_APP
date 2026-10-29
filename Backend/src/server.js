@@ -1,12 +1,14 @@
 import { app } from "./app.js";
 import { connectDatabase, disconnectDatabase } from "./config/database.js";
 import { env } from "./config/env.js";
+import { verifyEmailTransport } from "./config/email.js";
 
 let server;
 
 async function start(retries = 3) {
   try {
     await connectDatabase();
+    await verifyEmailTransport();
     server = app.listen(env.port, () => {
       console.info(`EthioPrep API listening on http://localhost:${env.port}`);
     });

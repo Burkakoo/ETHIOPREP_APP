@@ -2,6 +2,7 @@ import React from "react";
 
 export const ROLE_LABELS = {
   admin: "Administrator",
+  teacher: "Teacher",
   content_manager: "Content Manager",
   cash_manager: "Cash Manager",
   student: "Student",

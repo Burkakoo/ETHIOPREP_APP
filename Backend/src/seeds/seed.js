@@ -48,11 +48,15 @@ async function runSeed() {
         displayName: u.displayName,
         role: u.role,
         passwordHash,
-        status: "active"
+        status: "active",
+        emailVerified: true
       });
-      console.log(`Created user: ${u.email} (${u.role})`);
+      console.log(`Created user: ${u.email} (${u.role}) - Verified`);
     } else {
-      console.log(`User already exists: ${u.email}`);
+      existing.status = "active";
+      existing.emailVerified = true;
+      await existing.save();
+      console.log(`User already exists, set to active & verified: ${u.email}`);
     }
   }
 
@@ -232,6 +236,7 @@ async function runSeed() {
         description: "Official model exam adhering to the Ethiopian Ministry of Education entrance exam blueprint.",
         type: "mock_exam",
         subjectId: mathSub._id,
+        examYear: 2024,
         questionIds: seededQuestionIds,
         durationMinutes: 60,
         passingScore: 60,
@@ -289,6 +294,7 @@ async function runSeed() {
         description: "Comprehensive national mock exam for Ethiopian Social Science university entrance prep.",
         type: "mock_exam",
         subjectId: histSub._id,
+        examYear: 2024,
         questionIds: socialQIds,
         durationMinutes: 60,
         passingScore: 60,

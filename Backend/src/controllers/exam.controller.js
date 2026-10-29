@@ -8,12 +8,40 @@ import { Subject } from "../models/Subject.js";
 
 export async function listPublishedExams(request, response) {
   try {
-    const canManage = ["admin", "content_manager"].includes(request.user?.role);
+    const canManage = ["admin", "teacher", "content_manager"].includes(request.user?.role);
     const filter = request.query.includeAll === "true" && canManage ? {} : { status: "published" };
-    const exams = await Exam.find(filter)
+    const rawExams = await Exam.find(filter)
       .populate("subjectId", "name code stream gradeLevel")
-      .sort({ createdAt: -1 })
-      .limit(100);
+      .populate("chapterIds", "title order description")
+      .sort({ examYear: -1, createdAt: -1 })
+      .limit(100)
+      .lean();
+
+    const exams = await Promise.all(
+      rawExams.map(async (exam) => {
+        if (!Array.isArray(exam.questionIds) || exam.questionIds.length === 0) {
+          return { ...exam, chapterBreakdown: [] };
+        }
+        const counts = await Question.aggregate([
+          { $match: { _id: { $in: exam.questionIds }, isActive: true } },
+          { $group: { _id: "$chapterId", count: { $sum: 1 } } }
+        ]);
+        const chIds = counts.map((c) => c._id).filter(Boolean);
+        const chs = await Chapter.find({ _id: { $in: chIds } }).select("title order").lean();
+        const chapterBreakdown = counts.map((c) => {
+          const found = chs.find((ch) => String(ch._id) === String(c._id));
+          return {
+            chapterId: c._id ? String(c._id) : null,
+            title: found ? found.title : "General Unit",
+            order: found?.order ?? 999,
+            questionCount: c.count
+          };
+        }).sort((a, b) => a.order - b.order);
+
+        return { ...exam, chapterBreakdown };
+      })
+    );
+
     return response.json({ exams });
   } catch (error) {
     console.error(error);
@@ -25,7 +53,7 @@ export async function updateExam(request, response) {
   try {
     const exam = await Exam.findById(request.params.examId);
     if (!exam) return response.status(404).json({ error: "Exam not found." });
-    const { title, description, type, subjectId, chapterIds, questionIds, durationMinutes, passingScore, accessLevel, randomizeQuestions, randomizeOptions } = request.body;
+    const { title, description, type, subjectId, chapterIds, questionIds, durationMinutes, passingScore, accessLevel, randomizeQuestions, randomizeOptions, examYear } = request.body;
     const nextSubjectId = subjectId || String(exam.subjectId);
     const nextQuestionIds = questionIds === undefined ? exam.questionIds.map(String) : [...new Set(questionIds.map(String))];
     if (!title && title !== undefined || !mongoose.isValidObjectId(nextSubjectId) || !Array.isArray(nextQuestionIds) || !nextQuestionIds.length || !nextQuestionIds.every((id) => mongoose.isValidObjectId(id))) {
@@ -35,9 +63,13 @@ export async function updateExam(request, response) {
     const questions = await Question.find({ _id: { $in: nextQuestionIds }, subjectId: nextSubjectId, isActive: true }).select("_id").lean();
     if (!subject || questions.length !== nextQuestionIds.length) return response.status(400).json({ error: "All questions must be active and belong to the selected subject." });
     const updates = { subjectId: nextSubjectId, questionIds: nextQuestionIds };
+    if (examYear !== undefined && (!Number.isInteger(Number(examYear)) || Number(examYear) < 1900 || Number(examYear) > 3000)) {
+      return response.status(400).json({ error: "Exam year must be a valid year." });
+    }
     for (const [key, value] of Object.entries({ title, description, type, chapterIds, durationMinutes, passingScore, accessLevel, randomizeQuestions, randomizeOptions })) {
       if (value !== undefined) updates[key] = value;
     }
+    if (examYear !== undefined) updates.examYear = Number(examYear);
     const updated = await Exam.findByIdAndUpdate(request.params.examId, updates, { new: true, runValidators: true });
     return response.json({ exam: updated });
   } catch (error) {
@@ -59,7 +91,8 @@ export async function createExam(request, response) {
       passingScore,
       accessLevel,
       randomizeQuestions,
-      randomizeOptions
+      randomizeOptions,
+      examYear
     } = request.body;
 
     if (
@@ -68,9 +101,12 @@ export async function createExam(request, response) {
       !Array.isArray(questionIds) ||
       questionIds.length === 0 ||
       !questionIds.every((id) => mongoose.isValidObjectId(id)) ||
-      !durationMinutes
+      !durationMinutes ||
+      !Number.isInteger(Number(examYear)) ||
+      Number(examYear) < 1900 ||
+      Number(examYear) > 3000
     ) {
-      return response.status(400).json({ error: "Title, subjectId, questionIds, and durationMinutes are required." });
+      return response.status(400).json({ error: "Title, exam year, subjectId, questionIds, and durationMinutes are required." });
     }
 
     const subject = await Subject.findOne({ _id: subjectId, isActive: true }).lean();
@@ -93,6 +129,7 @@ export async function createExam(request, response) {
       description,
       type,
       subjectId,
+      examYear: Number(examYear),
       chapterIds: Array.isArray(chapterIds) ? chapterIds : [],
       questionIds,
       durationMinutes,
@@ -188,11 +225,12 @@ export async function startExamAttempt(request, response) {
     }
 
     if (exam.accessLevel === "premium") {
-      const activeSubscription = await Subscription.exists({
+      const isStaff = ["admin", "teacher", "content_manager"].includes(request.user?.role);
+      const activeSubscription = isStaff || (await Subscription.exists({
         userId: request.user._id,
         status: "active",
         endsAt: { $gt: new Date() }
-      });
+      }));
 
       if (!activeSubscription) {
         return response.status(403).json({ error: "An active subscription is required for this exam." });
@@ -205,7 +243,15 @@ export async function startExamAttempt(request, response) {
       status: "in_progress"
     });
 
-    const questionsRaw = await Question.find({ _id: { $in: exam.questionIds } })
+    const chapterId = request.query.chapterId || request.body?.chapterId;
+    const questionFilter = { _id: { $in: exam.questionIds }, isActive: true };
+    let chapterDoc = null;
+    if (chapterId && mongoose.isValidObjectId(chapterId)) {
+      questionFilter.chapterId = chapterId;
+      chapterDoc = await Chapter.findById(chapterId).select("title order").lean();
+    }
+
+    const questionsRaw = await Question.find(questionFilter)
       .select("-correctAnswer")
       .lean();
 
@@ -226,7 +272,14 @@ export async function startExamAttempt(request, response) {
       )
     }));
 
-    return response.status(201).json({ attempt, exam: { ...exam.toObject(), questions } });
+    const examObj = exam.toObject();
+    if (chapterDoc) {
+      examObj.title = `${exam.title} • ${chapterDoc.title}`;
+      examObj.chapterName = chapterDoc.title;
+      examObj.chapterId = String(chapterDoc._id);
+    }
+
+    return response.status(201).json({ attempt, exam: { ...examObj, questions } });
   } catch (error) {
     console.error(error);
     return response.status(500).json({ error: "Failed to start exam attempt." });

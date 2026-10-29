@@ -33,7 +33,7 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true, select: false },
     role: {
       type: String,
-      enum: ["student", "cash_manager", "content_manager", "admin"],
+      enum: ["student", "teacher", "cash_manager", "content_manager", "admin"],
       default: "student"
     },
     stream: {
@@ -55,6 +55,14 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true
     },
+    emailVerified: {
+      type: Boolean,
+      default: false
+    },
+    verificationOTP: { type: String, select: false },
+    verificationOTPExpiresAt: { type: Date, select: false },
+    resetPasswordOTP: { type: String, select: false },
+    resetPasswordOTPExpiresAt: { type: Date, select: false },
     lastLoginAt: Date
   },
   { timestamps: true, collection: "users" }

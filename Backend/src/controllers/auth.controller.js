@@ -1,7 +1,11 @@
 import { signToken, signRefreshToken, verifyToken } from "../config/jwt.js";
 import { User } from "../models/User.js";
 import { RefreshToken } from "../models/RefreshToken.js";
-import { ValidationError, ConflictError, NotFoundError, AuthenticationError, asyncHandler } from "../middleware/errorHandler.middleware.js";
+import { AppError, ValidationError, ConflictError, NotFoundError, AuthenticationError, asyncHandler } from "../middleware/errorHandler.middleware.js";
+import { generateOTP, sendVerificationEmail, sendPasswordResetEmail } from "../services/email.service.js";
+import { logger } from "../config/logger.js";
+
+const OTP_EXPIRY_MINUTES = 15;
 
 export const registerUser = asyncHandler(async (request, response) => {
   const { email, password, displayName, phoneNumber, stream = "natural" } = request.body;
@@ -22,6 +26,9 @@ export const registerUser = asyncHandler(async (request, response) => {
   }
 
   const passwordHash = await User.hashPassword(password);
+  const otp = generateOTP();
+  const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
   const user = await User.create({
     email: normalizedEmail,
     displayName,
@@ -29,9 +36,75 @@ export const registerUser = asyncHandler(async (request, response) => {
     passwordHash,
     role: "student",
     stream: ["natural", "social"].includes(stream) ? stream : "natural",
-    status: "active"
+    status: "pending",
+    emailVerified: false,
+    verificationOTP: otp,
+    verificationOTPExpiresAt: otpExpiresAt
   });
 
+  // Send verification email (non-blocking — don't fail registration if email fails)
+  sendVerificationEmail(normalizedEmail, otp, displayName).catch((err) => {
+    logger.error("Failed to send verification email during registration", {
+      userId: user._id,
+      error: err.message
+    });
+  });
+
+  return response.status(201).json({
+    message: "Registration successful. Please verify your email with the OTP sent to your inbox.",
+    requiresVerification: true,
+    user: {
+      id: user._id,
+      email: user.email,
+      displayName: user.displayName,
+      role: user.role,
+      stream: user.stream,
+      isPremium: Boolean(user.isPremium),
+      status: user.status,
+      emailVerified: user.emailVerified
+    }
+  });
+});
+
+export const verifyEmail = asyncHandler(async (request, response) => {
+  const { email, otp } = request.body;
+
+  if (!email || !otp) {
+    throw new ValidationError("Email and OTP code are required.");
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail })
+    .select("+verificationOTP +verificationOTPExpiresAt");
+
+  if (!user) {
+    throw new NotFoundError("No account found with this email.");
+  }
+
+  if (user.emailVerified) {
+    throw new ValidationError("Email is already verified.");
+  }
+
+  if (!user.verificationOTP || !user.verificationOTPExpiresAt) {
+    throw new ValidationError("No verification code found. Please request a new one.");
+  }
+
+  if (new Date() > user.verificationOTPExpiresAt) {
+    throw new ValidationError("Verification code has expired. Please request a new one.");
+  }
+
+  if (user.verificationOTP !== String(otp).trim()) {
+    throw new AuthenticationError("Invalid verification code.");
+  }
+
+  // Mark as verified and activate
+  user.emailVerified = true;
+  user.status = "active";
+  user.verificationOTP = undefined;
+  user.verificationOTPExpiresAt = undefined;
+  await user.save();
+
+  // Issue tokens after verification
   const accessToken = signToken({ userId: user._id, role: user.role });
   const refreshToken = signRefreshToken({ userId: user._id });
 
@@ -43,8 +116,8 @@ export const registerUser = asyncHandler(async (request, response) => {
     deviceId: request.headers["user-agent"]
   });
 
-  return response.status(201).json({
-    message: "User registered successfully.",
+  return response.json({
+    message: "Email verified successfully.",
     accessToken,
     refreshToken,
     user: {
@@ -54,9 +127,160 @@ export const registerUser = asyncHandler(async (request, response) => {
       role: user.role,
       stream: user.stream,
       isPremium: Boolean(user.isPremium),
-      status: user.status
+      status: user.status,
+      emailVerified: user.emailVerified
     }
   });
+});
+
+export const resendVerificationOTP = asyncHandler(async (request, response) => {
+  const { email } = request.body;
+
+  if (!email) {
+    throw new ValidationError("Email is required.");
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail });
+
+  if (!user) {
+    // Don't reveal whether the email exists
+    return response.json({ message: "If that email is registered, a new verification code has been sent." });
+  }
+
+  if (user.emailVerified) {
+    throw new ValidationError("Email is already verified.");
+  }
+
+  const otp = generateOTP();
+  const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
+  user.verificationOTP = otp;
+  user.verificationOTPExpiresAt = otpExpiresAt;
+  await user.save();
+
+  try {
+    await sendVerificationEmail(normalizedEmail, otp, user.displayName);
+  } catch (err) {
+    logger.error("Failed to send verification email during resend", {
+      userId: user._id,
+      error: err.message
+    });
+    throw new AppError("Failed to send verification email. Please check your network or try again later.", 500);
+  }
+
+  return response.json({ message: "If that email is registered, a new verification code has been sent." });
+});
+
+export const forgotPassword = asyncHandler(async (request, response) => {
+  const { email } = request.body;
+
+  if (!email) {
+    throw new ValidationError("Email is required.");
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail });
+
+  // Always return success to prevent email enumeration
+  if (!user || user.status === "deleted") {
+    return response.json({ message: "If an account exists with that email, a password reset code has been sent." });
+  }
+
+  const otp = generateOTP();
+  const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
+  user.resetPasswordOTP = otp;
+  user.resetPasswordOTPExpiresAt = otpExpiresAt;
+  await user.save();
+
+  try {
+    await sendPasswordResetEmail(normalizedEmail, otp, user.displayName);
+  } catch (err) {
+    logger.error("Failed to send password reset email", {
+      userId: user._id,
+      error: err.message
+    });
+    throw new AppError("Failed to send password reset email. Please try again later.", 500);
+  }
+
+  return response.json({ message: "If an account exists with that email, a password reset code has been sent." });
+});
+
+export const verifyResetOTP = asyncHandler(async (request, response) => {
+  const { email, otp } = request.body;
+
+  if (!email || !otp) {
+    throw new ValidationError("Email and OTP code are required.");
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail })
+    .select("+resetPasswordOTP +resetPasswordOTPExpiresAt");
+
+  if (!user) {
+    throw new AuthenticationError("Invalid email or reset code.");
+  }
+
+  if (!user.resetPasswordOTP || !user.resetPasswordOTPExpiresAt) {
+    throw new ValidationError("No reset code found. Please request a new one.");
+  }
+
+  if (new Date() > user.resetPasswordOTPExpiresAt) {
+    throw new ValidationError("Reset code has expired. Please request a new one.");
+  }
+
+  if (user.resetPasswordOTP !== String(otp).trim()) {
+    throw new AuthenticationError("Invalid reset code.");
+  }
+
+  return response.json({ message: "OTP verified. You can now reset your password.", valid: true });
+});
+
+export const resetPassword = asyncHandler(async (request, response) => {
+  const { email, otp, newPassword } = request.body;
+
+  if (!email || !otp || !newPassword) {
+    throw new ValidationError("Email, OTP code, and new password are required.");
+  }
+
+  if (String(newPassword).length < 8) {
+    throw new ValidationError("New password must be at least 8 characters long.");
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail })
+    .select("+resetPasswordOTP +resetPasswordOTPExpiresAt");
+
+  if (!user) {
+    throw new AuthenticationError("Invalid email or reset code.");
+  }
+
+  if (!user.resetPasswordOTP || !user.resetPasswordOTPExpiresAt) {
+    throw new ValidationError("No reset code found. Please request a new one.");
+  }
+
+  if (new Date() > user.resetPasswordOTPExpiresAt) {
+    throw new ValidationError("Reset code has expired. Please request a new one.");
+  }
+
+  if (user.resetPasswordOTP !== String(otp).trim()) {
+    throw new AuthenticationError("Invalid reset code.");
+  }
+
+  // Update password and clear reset token
+  user.passwordHash = await User.hashPassword(newPassword);
+  user.resetPasswordOTP = undefined;
+  user.resetPasswordOTPExpiresAt = undefined;
+  await user.save();
+
+  // Revoke all existing refresh tokens for security
+  await RefreshToken.updateMany(
+    { userId: user._id, revoked: false },
+    { revoked: true, revokedAt: new Date() }
+  );
+
+  return response.json({ message: "Password reset successful. Please sign in with your new password." });
 });
 
 export const loginUser = asyncHandler(async (request, response) => {
@@ -76,6 +300,19 @@ export const loginUser = asyncHandler(async (request, response) => {
 
   if (!isMatch) {
     throw new AuthenticationError("Invalid email or password.");
+  }
+
+  // Block unverified users
+  if (!user.emailVerified) {
+    return response.status(403).json({
+      error: "Please verify your email before signing in.",
+      requiresVerification: true,
+      email: user.email
+    });
+  }
+
+  if (user.status === "suspended") {
+    throw new AuthenticationError("Your account has been suspended. Please contact support.");
   }
 
   user.lastLoginAt = new Date();
@@ -103,7 +340,8 @@ export const loginUser = asyncHandler(async (request, response) => {
       role: user.role,
       stream: user.stream || "natural",
       isPremium: Boolean(user.isPremium),
-      status: user.status
+      status: user.status,
+      emailVerified: user.emailVerified
     }
   });
 });
@@ -203,7 +441,7 @@ export const updatePassword = asyncHandler(async (request, response) => {
   });
 });
 
-export const refreshToken = asyncHandler(async (request, response) => {
+export const refreshTokenHandler = asyncHandler(async (request, response) => {
   const { refreshToken: token } = request.body;
 
   if (!token) {
@@ -265,4 +503,3 @@ export const logout = asyncHandler(async (request, response) => {
     message: "Logged out successfully."
   });
 });
-

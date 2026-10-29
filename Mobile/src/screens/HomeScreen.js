@@ -1,247 +1,37 @@
-import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { Card } from "../components/Card.js";
-import { Icon } from "../components/Icon.js";
+import React, { useEffect, useMemo, useState } from "react";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { EmptyState } from "../components/EmptyState.js";
-import { COLORS, RADIUS, SPACING } from "../utils/theme.js";
+import { Icon } from "../components/Icon.js";
+import { COLORS, RADIUS, SHADOW, SPACING } from "../utils/theme.js";
 
-export function HomeScreen({ user, subjects = [], onSelectSubject, onNavigateTab }) {
-  // Lock strictly to the student's registered stream
-  const userStream = user?.stream || "natural";
-  const isNatural = userStream === "natural";
+const GRADES = [9, 10, 11, 12];
+const SUBJECT_ICONS = { BIO: "git-branch-outline", CHEM: "flask-outline", PHYS: "speedometer-outline", ENG: "document-text-outline", GEOG: "earth-outline", HIST: "time-outline", ECON: "wallet-outline", MATH: "calculator-outline", APTITUDE: "bulb-outline", SAT: "school-outline" };
+function subjectIcon(subject) { const key = Object.keys(SUBJECT_ICONS).find((code) => (subject.code || "").includes(code)); return key ? SUBJECT_ICONS[key] : "book-outline"; }
+function subjectSupportsGrade(subject, grade) { const levels = String(subject.gradeLevel || "").match(/\d+/g)?.map(Number) || []; return !levels.length || (levels.length > 1 ? grade >= Math.min(...levels) && grade <= Math.max(...levels) : levels.includes(grade)); }
 
-  const filteredSubjects = subjects.filter((subj) => {
-    if (isNatural) {
-      return (
-        ["MATH_NAT", "PHYS", "CHEM", "BIO", "ENG", "APTITUDE", "SAT"].includes(subj.code) ||
-        subj.stream === "natural" ||
-        subj.stream === "both"
-      );
+export function HomeScreen({ user, subjects = [], onSelectSubject }) {
+  const [selectedGrade, setSelectedGrade] = useState(9);
+  const isNatural = (user?.stream || "natural") === "natural";
+  const streamSubjects = useMemo(() => subjects.filter((subject) => {
+    if (subject.stream) return subject.stream === "both" || subject.stream === (isNatural ? "natural" : "social");
+    const code = subject.code || "";
+    return isNatural ? !["HIST", "GEOG", "ECON", "MATH_SOC"].includes(code) : !["PHYS", "CHEM", "BIO", "MATH_NAT"].includes(code);
+  }), [subjects, isNatural]);
+  useEffect(() => {
+    if (!streamSubjects.some((subject) => subjectSupportsGrade(subject, selectedGrade))) {
+      const firstAvailableGrade = GRADES.find((grade) => streamSubjects.some((subject) => subjectSupportsGrade(subject, grade)));
+      if (firstAvailableGrade) setSelectedGrade(firstAvailableGrade);
     }
-    // Social Science
-    return (
-      ["MATH_SOC", "HIST", "GEOG", "ECON", "ENG", "APTITUDE", "SAT"].includes(subj.code) ||
-      subj.stream === "social" ||
-      subj.stream === "both"
-    );
-  });
-
-  return (
-    <View style={styles.container}>
-      <Card style={styles.heroCard}>
-        <View style={styles.heroTopRow}>
-          <Text style={styles.greeting}>Welcome, {user?.displayName?.split(" ")[0]}!</Text>
-          <View style={styles.streamBadge}>
-            <Text style={styles.streamBadgeText}>
-              <Icon color={COLORS.onPrimary} name={isNatural ? "flask-outline" : "library-outline"} size={12} />{" "}
-              {isNatural ? "Natural Science" : "Social Science"}
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.heroSubtitle}>
-          Ethiopian University Entrance Examination (EUEE) Preparation
-        </Text>
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{filteredSubjects.length}</Text>
-            <Text style={styles.statLabel}>Stream Subjects</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <TouchableOpacity onPress={() => onNavigateTab("exams")} style={styles.statBox}>
-            <Text style={styles.statNumber}>Mock</Text>
-            <Text style={styles.statLabel}>Exams</Text>
-          </TouchableOpacity>
-          <View style={styles.statDivider} />
-          <TouchableOpacity onPress={() => onNavigateTab("progress")} style={styles.statBox}>
-            <Text style={styles.statNumber}>Track</Text>
-            <Text style={styles.statLabel}>Progress</Text>
-          </TouchableOpacity>
-        </View>
-      </Card>
-
-      {/* Locked stream indicator banner */}
-      <View style={styles.streamInfoBanner}>
-        <Text style={styles.streamInfoTitle}>
-          <Icon color={COLORS.primary} name={isNatural ? "flask-outline" : "library-outline"} size={15} />{"  "}
-          {isNatural ? "Natural Science Stream" : "Social Science Stream"}
-        </Text>
-        <Text style={styles.streamInfoDesc}>
-          {isNatural
-            ? "Displaying only your 6 Natural Science subjects: Math (Nat), Physics, Chemistry, Biology, English & Aptitude."
-            : "Displaying only your 6 Social Science subjects: Math (Soc), Economics, Geography, History, English & Aptitude."}
-        </Text>
-      </View>
-
-      <Text style={styles.sectionHeader}>
-        {isNatural ? "Natural Science Subjects" : "Social Science Subjects"}
-      </Text>
-
-      {filteredSubjects.length === 0 ? (
-        <EmptyState icon="library-outline" message="No subjects found for this category." title="No subjects yet" />
-      ) : (
-        filteredSubjects.map((subject) => (
-          <TouchableOpacity
-            activeOpacity={0.7}
-            key={subject._id || subject.code}
-            onPress={() => onSelectSubject && onSelectSubject(subject)}
-          >
-            <Card style={styles.subjectCard}>
-              <View style={styles.subjectHeader}>
-                <View style={styles.codeTag}>
-                  <Text style={styles.codeTagText}>{subject.code || "SUBJ"}</Text>
-                </View>
-                <Text style={styles.gradeBadge}>
-                  {subject.gradeLevel ? subject.gradeLevel.replace("-", " ") : "Grade 11-12"}
-                </Text>
-              </View>
-              <Text style={styles.subjectTitle}>{subject.name}</Text>
-              <Text numberOfLines={2} style={styles.subjectDesc}>
-                {subject.description || "Comprehensive syllabus notes and national exam question bank."}
-              </Text>
-            </Card>
-          </TouchableOpacity>
-        ))
-      )}
-    </View>
-  );
+  }, [selectedGrade, streamSubjects]);
+  const gradeSubjects = streamSubjects.filter((subject) => subjectSupportsGrade(subject, selectedGrade));
+  return <View style={styles.container}>
+    <View style={styles.intro}><Text style={styles.title}>Choose a subject</Text><Text style={styles.subtitle}>Select your grade, then pick a subject to practise past exam questions.</Text></View>
+    <ScrollView contentContainerStyle={styles.gradeTabs} horizontal showsHorizontalScrollIndicator={false}>{GRADES.map((grade) => { const active = selectedGrade === grade; return <TouchableOpacity key={grade} onPress={() => setSelectedGrade(grade)} style={[styles.gradeTab, active && styles.gradeTabActive]}><Text style={[styles.gradeTabText, active && styles.gradeTabTextActive]}>Grade {grade}</Text></TouchableOpacity>; })}</ScrollView>
+    <Text style={styles.sectionTitle}>Grade {selectedGrade} subjects</Text>
+    {gradeSubjects.length === 0 ? <EmptyState icon="library-outline" title="No subjects yet" message={`Subjects for Grade ${selectedGrade} will appear here.`} /> : <View style={styles.subjectGrid}>{gradeSubjects.map((subject) => <TouchableOpacity activeOpacity={0.8} key={subject._id || subject.code} onPress={() => onSelectSubject(subject)} style={styles.subjectCard}><View style={styles.subjectIcon}><Icon color={COLORS.onPrimary} name={subjectIcon(subject)} size={28} /></View><Text numberOfLines={2} style={styles.subjectName}>{subject.name}</Text><View style={styles.gradePill}><Text style={styles.gradePillText}>Grade {selectedGrade}</Text></View><View style={styles.cardFooter}><Text style={styles.cardFooterText}>Exams & Notes</Text><Icon color={COLORS.primary} name="arrow-forward" size={16} /></View></TouchableOpacity>)}</View>}
+  </View>;
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingBottom: SPACING.xl
-  },
-  heroCard: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primaryDark
-  },
-  greeting: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: COLORS.onPrimary
-  },
-  heroSubtitle: {
-    fontSize: 13,
-    color: COLORS.surfaceMuted,
-    marginTop: 4,
-    marginBottom: SPACING.lg
-  },
-  statsRow: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.sm,
-    justifyContent: "space-around",
-    alignItems: "center"
-  },
-  statBox: {
-    alignItems: "center",
-    flex: 1
-  },
-  statNumber: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: COLORS.onPrimary
-  },
-  statLabel: {
-    fontSize: 11,
-    color: COLORS.surfaceMuted,
-    marginTop: 2
-  },
-  statDivider: {
-    width: 1,
-    height: "60%",
-    backgroundColor: "rgba(255, 255, 255, 0.2)"
-  },
-  streamInfoBanner: {
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    marginVertical: SPACING.md
-  },
-  streamInfoTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: COLORS.primary,
-    marginBottom: 2
-  },
-  streamInfoDesc: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    lineHeight: 17
-  },
-  sectionHeader: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: COLORS.text,
-    marginBottom: SPACING.sm,
-    marginTop: SPACING.xs
-  },
-  subjectCard: {
-    marginBottom: SPACING.sm
-  },
-  subjectHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: SPACING.xs
-  },
-  codeTag: {
-    backgroundColor: COLORS.surfaceMuted,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm
-  },
-  codeTagText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: COLORS.primary
-  },
-  gradeBadge: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: COLORS.textMuted,
-    textTransform: "capitalize"
-  },
-  subjectTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: COLORS.text,
-    marginBottom: 4
-  },
-  subjectDesc: {
-    fontSize: 13,
-    color: COLORS.textMuted,
-    lineHeight: 18
-  },
-  emptyText: {
-    textAlign: "center",
-    color: COLORS.textMuted,
-    paddingVertical: SPACING.md
-  },
-  heroTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center"
-  },
-  streamBadge: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 3,
-    borderRadius: RADIUS.full
-  },
-  streamBadgeText: {
-    color: COLORS.onPrimary,
-    fontSize: 11,
-    fontWeight: "800"
-  },
-  streamHeaderLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.textMuted,
-    marginTop: SPACING.xs
-  }
+  container: { paddingBottom: SPACING.xl }, intro: { marginBottom: SPACING.md }, title: { color: COLORS.text, fontSize: 25, fontWeight: "800", letterSpacing: -0.5 }, subtitle: { color: COLORS.textMuted, fontSize: 14, lineHeight: 20, marginTop: 5 }, gradeTabs: { gap: SPACING.sm, paddingBottom: SPACING.md }, gradeTab: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: RADIUS.full, borderWidth: 1, paddingHorizontal: 19, paddingVertical: 11 }, gradeTabActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary }, gradeTabText: { color: COLORS.textMuted, fontSize: 14, fontWeight: "800" }, gradeTabTextActive: { color: COLORS.onPrimary }, sectionTitle: { color: COLORS.text, fontSize: 17, fontWeight: "800", marginBottom: SPACING.sm }, subjectGrid: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.md }, subjectCard: { backgroundColor: COLORS.surface, borderColor: COLORS.border, borderRadius: RADIUS.xl, borderWidth: 1, minHeight: 202, padding: SPACING.md, width: "47.5%", ...SHADOW.sm }, subjectIcon: { alignItems: "center", backgroundColor: COLORS.primary, borderRadius: 17, height: 58, justifyContent: "center", width: 58 }, subjectName: { color: COLORS.text, fontSize: 17, fontWeight: "800", marginTop: SPACING.md, minHeight: 42 }, gradePill: { alignSelf: "flex-start", backgroundColor: COLORS.primaryBg, borderRadius: RADIUS.full, marginTop: SPACING.sm, paddingHorizontal: 10, paddingVertical: 5 }, gradePillText: { color: COLORS.primaryDark, fontSize: 11, fontWeight: "800" }, cardFooter: { alignItems: "center", borderTopColor: COLORS.border, borderTopWidth: 1, flexDirection: "row", justifyContent: "space-between", marginTop: "auto", paddingTop: SPACING.sm }, cardFooterText: { color: COLORS.textMuted, fontSize: 12, fontWeight: "700" }
 });

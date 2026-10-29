@@ -140,6 +140,15 @@ EXPO_PUBLIC_API_URL=http://localhost:5000/api
 - ✅ Updated .env.example with documentation
 - ✅ Credentials enabled for cookie support
 
+### Phase 9: EUEE / ESSLCE Past Exams Seeding (2013 – 2017 E.C.) ✅
+- ✅ Total 29 exams, 2,276 questions seeded and published across 5 academic years:
+  - **2013 E.C. (6 exams / 475 Qs)**: Biology (100), Chemistry (80), English (120), Math (65), Physics (50), SAT (60)
+  - **2014 E.C. (6 exams / 475 Qs)**: Biology (100), Chemistry (80), English (120), Math (65), Physics (50), SAT (60)
+  - **2015 E.C. (6 exams / 475 Qs)**: Biology (100), Chemistry (80), English (120), Math (65), Physics (50), SAT (60)
+  - **2016 E.C. (6 exams / 477 Qs)**: Biology (100), Chemistry (77), English (120), Math (60), Physics (60), SAT (60)
+  - **2017 E.C. (5 exams / 380 Qs)**: Biology (100), Math (60), Physics (60), SAT (60), English (100)
+- ✅ All questions indexed with complete options, verified single-letter answers, embedded stimuli/passages, and detailed pedagogical explanations.
+
 ## Backend Architecture
 
 ### Middleware
@@ -178,10 +187,15 @@ logger.error("Error occurred", { error, stack });
 ## API Endpoints
 
 ### Authentication
-- POST /api/auth/register - Returns accessToken and refreshToken
-- POST /api/auth/login - Returns accessToken and refreshToken
-- POST /api/auth/refresh-token - Get new access token (NEW)
-- POST /api/auth/logout - Revoke refresh token (NEW)
+- POST /api/auth/register - Creates user with status "pending", sends verification OTP email
+- POST /api/auth/login - Returns accessToken and refreshToken (blocks unverified users)
+- POST /api/auth/verify-email - Verify email with OTP, activates user, returns tokens
+- POST /api/auth/resend-verification - Resend verification OTP email
+- POST /api/auth/forgot-password - Send password reset OTP email
+- POST /api/auth/verify-reset-otp - Verify password reset OTP
+- POST /api/auth/reset-password - Reset password with OTP and new password
+- POST /api/auth/refresh-token - Get new access token
+- POST /api/auth/logout - Revoke refresh token
 - GET /api/auth/me
 - GET /api/auth/profile
 - PATCH /api/auth/profile
@@ -301,21 +315,13 @@ The following page components remain in main.jsx and should be extracted:
   - React: 18.3.1
   - React Native: 0.76.9
   - Expo: ~52.0.0
-- Current Stack (SDK 57, upgraded 2026-10-18):
-  - React: 19.2.3
-  - React Native: 0.86.3
-  - Expo: ~57.0.0 (57.0.30)
-  - expo-asset: 57.0.20, expo-font: 57.0.4, expo-status-bar: 57.0.1
-  - expo-image-picker: 57.0.20, async-storage: 2.2.0
-- Upgrade was performed to match installed Expo Go SDK 57 on the user's device.
-- Previous Attempts to Fix (on SDK 52):
-  - ✅ Created babel.config.js with babel-preset-expo preset
-  - ✅ Created metro.config.js with Expo defaults
-  - ✅ Installed babel-preset-expo package
-  - ❌ Removed config files (Expo 57 may use internal config)
-  - ❌ Started with --clear flag (no improvement)
-  - ❌ Tried --tunnel flag (requires ngrok, unrelated issue)
-- Current Status: Upgraded to Expo SDK 57 / React 19.2.3 / React Native 0.86.3 to match the installed Expo Go app. The Metro bundler startup issue should be re-tested with the new stack.
+- Current Stack (SDK 58, upgraded 2026-10-24):
+  - React: 19.3.0
+  - React Native: 0.88.0
+  - Expo: ^58.0.19
+  - expo-asset: ~58.0.18, expo-clipboard: ~58.0.4, expo-font: ~58.0.10, expo-status-bar: ~58.0.4
+  - expo-image-picker: ~58.0.10, react-native-safe-area-context: ~5.10.1, async-storage: 2.2.0
+- Upgrade was performed to match the latest Expo SDK 58 release. All 20/20 expo-doctor checks pass and Metro bundling succeeds.
 
 **Security Vulnerabilities** (22 total - 7 moderate, 15 high after SDK 57 upgrade):
 - Located in Expo build tooling transitive dependencies:

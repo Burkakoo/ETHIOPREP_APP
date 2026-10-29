@@ -6,8 +6,11 @@ import { Notice } from "../components/Notice.js";
 import { login, register } from "../services/api.js";
 import { Icon } from "../components/Icon.js";
 import { COLORS, RADIUS, SPACING } from "../utils/theme.js";
+import { VerifyEmailScreen } from "./VerifyEmailScreen.js";
+import { ForgotPasswordScreen } from "./ForgotPasswordScreen.js";
 
 export function AuthScreen({ onLoginSuccess }) {
+  const [screen, setScreen] = useState("auth"); // 'auth' | 'verify' | 'forgot'
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,6 +19,7 @@ export function AuthScreen({ onLoginSuccess }) {
   const [stream, setStream] = useState("natural"); // 'natural' | 'social'
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
 
   async function handleSubmit() {
     setError("");
@@ -31,18 +35,62 @@ export function AuthScreen({ onLoginSuccess }) {
 
     setLoading(true);
     try {
-      let result;
       if (isRegister) {
-        result = await register({ email, password, displayName, phoneNumber, stream });
+        const result = await register({ email, password, displayName, phoneNumber, stream });
+        // Registration now requires email verification
+        if (result.requiresVerification) {
+          setPendingVerificationEmail(email.trim().toLowerCase());
+          setScreen("verify");
+        } else {
+          onLoginSuccess(result.user);
+        }
       } else {
-        result = await login(email, password);
+        const result = await login(email, password);
+        onLoginSuccess(result.user);
       }
-      onLoginSuccess(result.user);
     } catch (err) {
+      // Check if login returned requiresVerification
+      if (err.message && err.message.includes("verify your email")) {
+        setPendingVerificationEmail(email.trim().toLowerCase());
+        setScreen("verify");
+        return;
+      }
       setError(err.message || "Authentication failed.");
     } finally {
       setLoading(false);
     }
+  }
+
+  // Show Verify Email screen
+  if (screen === "verify") {
+    return (
+      <VerifyEmailScreen
+        email={pendingVerificationEmail}
+        onVerified={(user) => onLoginSuccess(user)}
+        onBack={() => {
+          setScreen("auth");
+          setIsRegister(false);
+          setError("");
+        }}
+      />
+    );
+  }
+
+  // Show Forgot Password screen
+  if (screen === "forgot") {
+    return (
+      <ForgotPasswordScreen
+        onBack={() => {
+          setScreen("auth");
+          setError("");
+        }}
+        onResetSuccess={() => {
+          setScreen("auth");
+          setIsRegister(false);
+          setError("");
+        }}
+      />
+    );
   }
 
   return (
@@ -127,6 +175,20 @@ export function AuthScreen({ onLoginSuccess }) {
           value={password}
         />
 
+        {/* Forgot Password link — login mode only */}
+        {!isRegister && (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              setScreen("forgot");
+              setError("");
+            }}
+            style={styles.forgotBtn}
+          >
+            <Text style={styles.forgotText}>Forgot Password?</Text>
+          </TouchableOpacity>
+        )}
+
         <Button loading={loading} onPress={handleSubmit} style={styles.submitBtn}>
           {isRegister ? "Create Account" : "Sign In"}
         </Button>
@@ -178,6 +240,15 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     marginTop: SPACING.sm
+  },
+  forgotBtn: {
+    alignItems: "flex-end",
+    marginBottom: SPACING.xs
+  },
+  forgotText: {
+    color: COLORS.primary,
+    fontWeight: "700",
+    fontSize: 13
   },
   switchBtn: {
     marginTop: SPACING.lg,

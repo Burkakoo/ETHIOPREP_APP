@@ -30,7 +30,7 @@ export async function updateUserRole(request, response) {
     const { id } = request.params;
     const { role } = request.body;
 
-    if (!["student", "content_manager", "cash_manager", "admin"].includes(role)) {
+    if (!["student", "teacher", "content_manager", "cash_manager", "admin"].includes(role)) {
       return response.status(400).json({ error: "Invalid role specified." });
     }
 
@@ -54,11 +54,22 @@ export async function updateUserRole(request, response) {
 export async function updateUserStatus(request, response) {
   try {
     const { id } = request.params;
-    const { status, isPremium } = request.body;
+    const { status, isPremium, emailVerified } = request.body;
 
     const updates = {};
-    if (status && ["active", "suspended", "deleted"].includes(status)) {
+    if (status && ["pending", "active", "suspended", "deleted"].includes(status)) {
       updates.status = status;
+      // Activating an account marks their email as verified automatically
+      if (status === "active" && emailVerified === undefined) {
+        updates.emailVerified = true;
+      }
+    }
+    if (typeof emailVerified === "boolean") {
+      updates.emailVerified = emailVerified;
+      // If marking as email-verified and status was pending, activate the user
+      if (emailVerified && !status) {
+        updates.status = "active";
+      }
     }
     if (typeof isPremium === "boolean") {
       updates.isPremium = isPremium;
@@ -80,3 +91,55 @@ export async function updateUserStatus(request, response) {
     return response.status(500).json({ error: "Failed to update user status." });
   }
 }
+
+export async function createStaffUser(request, response) {
+  try {
+    const { email, password, displayName, role = "content_manager", phoneNumber } = request.body;
+
+    if (!email || !password || !displayName) {
+      return response.status(400).json({ error: "Email, password, and displayName are required." });
+    }
+
+    if (String(password).length < 8) {
+      return response.status(400).json({ error: "Password must be at least 8 characters long." });
+    }
+
+    if (!["teacher", "content_manager", "cash_manager", "admin"].includes(role)) {
+      return response.status(400).json({ error: "Invalid staff role specified." });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const existing = await User.findOne({ email: normalizedEmail });
+    if (existing) {
+      return response.status(409).json({ error: "A user with this email already exists." });
+    }
+
+    const passwordHash = await User.hashPassword(password);
+    const user = await User.create({
+      email: normalizedEmail,
+      displayName: String(displayName).trim(),
+      phoneNumber: phoneNumber ? String(phoneNumber).trim() : undefined,
+      passwordHash,
+      role,
+      status: "active",
+      emailVerified: true
+    });
+
+    return response.status(201).json({
+      message: "Staff member created and activated successfully.",
+      user: {
+        id: user._id,
+        _id: user._id,
+        email: user.email,
+        displayName: user.displayName,
+        role: user.role,
+        status: user.status,
+        emailVerified: user.emailVerified
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    return response.status(500).json({ error: error.message || "Failed to create staff account." });
+  }
+}
+
