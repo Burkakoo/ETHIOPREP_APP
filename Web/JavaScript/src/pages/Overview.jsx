@@ -1,8 +1,7 @@
 import React from "react";
 import { BookOpenIcon, CheckIcon, CircleHelpIcon, CreditCardIcon, FileTextIcon, XIcon } from "lucide-react";
-import { apiRequest } from "../services/api.js";
-import { statusBadge } from "../components/Badge.jsx";
 import { getGreeting } from "../utils/helpers.js";
+import { WeeklyPerformanceChart } from "../components/WeeklyPerformanceChart.jsx";
 
 export function Overview({ user, stats }) {
   const items = [
@@ -32,18 +31,21 @@ export function Overview({ user, stats }) {
           ))}
         </div>
 
+        {/* Weekly Quiz Performance Line Chart */}
+        <WeeklyPerformanceChart />
+
         <div className="panel">
           <div className="panel-header">
-            <span className="panel-title">Your Role & Permissions</span>
+            <span className="panel-title">Your Role &amp; Permissions</span>
           </div>
           <div className="panel-body">
             <table>
               <thead><tr><th>Capability</th><th>Access</th></tr></thead>
               <tbody>
                 {[
-                  ["Manage Subjects & Chapters", ["admin", "content_manager"]],
-                  ["Create & Publish Exams", ["admin", "content_manager"]],
-                  ["Manage Question Bank", ["admin", "content_manager"]],
+                  ["Manage Subjects & Chapters", ["admin", "teacher", "content_manager"]],
+                  ["Create & Publish Exams", ["admin", "teacher", "content_manager"]],
+                  ["Manage Question Bank", ["admin", "teacher", "content_manager"]],
                   ["Verify Payments", ["admin", "cash_manager"]],
                   ["View Analytics", ["admin"]],
                   ["Manage All Users", ["admin"]],

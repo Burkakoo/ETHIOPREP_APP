@@ -9,7 +9,10 @@ export async function getSubjects(request, response) {
     if (request.query.stream && ["natural", "social"].includes(request.query.stream)) {
       filter.$or = [{ stream: request.query.stream }, { stream: "both" }];
     }
-    const subjects = await Subject.find(filter).sort({ name: 1 });
+    if (request.query.gradeLevel) {
+      filter.gradeLevel = request.query.gradeLevel;
+    }
+    const subjects = await Subject.find(filter).sort({ name: 1, gradeLevel: 1 });
     return response.json({ subjects });
   } catch (error) {
     console.error(error);
@@ -195,20 +198,28 @@ export async function reactivateChapter(request, response) {
 
 export async function getQuestions(request, response) {
   try {
-    const { subjectId, chapterId } = request.query;
+    const { subjectId, chapterId, gradeLevel } = request.query;
     const canManage = ["admin", "teacher", "content_manager"].includes(request.user?.role);
     const filter = request.query.includeInactive === "true" && canManage ? {} : { isActive: true };
 
-    if (subjectId) filter.subjectId = subjectId;
+    if (subjectId) {
+      filter.subjectId = subjectId;
+    } else if (gradeLevel) {
+      const gradeSubjects = await Subject.find({ gradeLevel }).select("_id").lean();
+      filter.subjectId = { $in: gradeSubjects.map((s) => s._id) };
+    }
     if (chapterId) filter.chapterId = chapterId;
 
-    const questionQuery = Question.find(filter).sort({ createdAt: -1 }).limit(200);
+    const questionQuery = Question.find(filter).sort({ createdAt: -1 }).limit(300);
     if (request.user.role === "student") {
       questionQuery.select("-correctAnswer");
     }
 
-    const questions = await questionQuery;
-    return response.json({ questions });
+    const [questions, totalCount] = await Promise.all([
+      questionQuery,
+      Question.countDocuments(filter)
+    ]);
+    return response.json({ questions, totalCount });
   } catch (error) {
     console.error(error);
     return response.status(500).json({ error: "Failed to fetch questions." });

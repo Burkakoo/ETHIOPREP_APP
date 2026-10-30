@@ -6,16 +6,54 @@ import { Question } from "../models/Question.js";
 import { Subscription } from "../models/Subscription.js";
 import { Subject } from "../models/Subject.js";
 
+function getDisciplineKey(subject) {
+  if (!subject) return "";
+  const code = String(subject.code || "").toUpperCase();
+  const name = String(subject.name || "").toLowerCase();
+  if (code.includes("BIO") || name.includes("bio")) return "BIO";
+  if (code.includes("CHEM") || name.includes("chem")) return "CHEM";
+  if (code.includes("PHYS") || name.includes("phys")) return "PHYS";
+  if (code.includes("MATH") || name.includes("math")) return "MATH";
+  if (code.includes("ENG") || name.includes("eng")) return "ENG";
+  if (code.includes("GEOG") || name.includes("geog")) return "GEOG";
+  if (code.includes("HIST") || name.includes("hist")) return "HIST";
+  if (code.includes("ECON") || name.includes("econ")) return "ECON";
+  if (code.includes("SAT") || name.includes("sat") || code.includes("APTITUDE")) return "SAT";
+  return code.split("_")[0] || code;
+}
+
+const GRADE_SORT_ORDER = {
+  "grade-9": 9,
+  "grade-10": 10,
+  "grade-11": 11,
+  "grade-12": 12,
+  college: 13
+};
+
+async function getAllowedDisciplineSubjectIds(primarySubject) {
+  if (!primarySubject) return [];
+  const allActive = await Subject.find({ isActive: true }).select("_id name code").lean();
+  const discipline = getDisciplineKey(primarySubject);
+  if (!discipline) return [primarySubject._id];
+  const matched = allActive.filter((s) => getDisciplineKey(s) === discipline).map((s) => s._id);
+  return matched.length ? matched : [primarySubject._id];
+}
+
 export async function listPublishedExams(request, response) {
   try {
     const canManage = ["admin", "teacher", "content_manager"].includes(request.user?.role);
     const filter = request.query.includeAll === "true" && canManage ? {} : { status: "published" };
-    const rawExams = await Exam.find(filter)
-      .populate("subjectId", "name code stream gradeLevel")
-      .populate("chapterIds", "title order description")
-      .sort({ examYear: -1, createdAt: -1 })
-      .limit(100)
-      .lean();
+    const [rawExams, allSubjects] = await Promise.all([
+      Exam.find(filter)
+        .populate("subjectId", "name code stream gradeLevel")
+        .populate("chapterIds", "title order description subjectId")
+        .sort({ examYear: -1, createdAt: -1 })
+        .limit(100)
+        .lean(),
+      Subject.find().select("_id name code gradeLevel").lean()
+    ]);
+
+    const subjectById = new Map(allSubjects.map((s) => [String(s._id), s]));
 
     const exams = await Promise.all(
       rawExams.map(async (exam) => {
@@ -27,16 +65,30 @@ export async function listPublishedExams(request, response) {
           { $group: { _id: "$chapterId", count: { $sum: 1 } } }
         ]);
         const chIds = counts.map((c) => c._id).filter(Boolean);
-        const chs = await Chapter.find({ _id: { $in: chIds } }).select("title order").lean();
-        const chapterBreakdown = counts.map((c) => {
-          const found = chs.find((ch) => String(ch._id) === String(c._id));
-          return {
-            chapterId: c._id ? String(c._id) : null,
-            title: found ? found.title : "General Unit",
-            order: found?.order ?? 999,
-            questionCount: c.count
-          };
-        }).sort((a, b) => a.order - b.order);
+        const chs = await Chapter.find({ _id: { $in: chIds } }).select("title order subjectId").lean();
+        const examSubj = typeof exam.subjectId === "object" && exam.subjectId ? exam.subjectId : subjectById.get(String(exam.subjectId));
+
+        const chapterBreakdown = counts
+          .map((c) => {
+            const found = chs.find((ch) => String(ch._id) === String(c._id));
+            const chSubject = found?.subjectId ? subjectById.get(String(found.subjectId)) : examSubj;
+            const gradeLevel = chSubject?.gradeLevel || examSubj?.gradeLevel || "grade-12";
+            const subjectCode = chSubject?.code || examSubj?.code || "";
+            return {
+              chapterId: c._id ? String(c._id) : null,
+              title: found ? found.title : "General Unit",
+              order: found?.order ?? 999,
+              gradeLevel,
+              subjectCode,
+              questionCount: c.count
+            };
+          })
+          .sort((a, b) => {
+            const ga = GRADE_SORT_ORDER[a.gradeLevel] ?? 99;
+            const gb = GRADE_SORT_ORDER[b.gradeLevel] ?? 99;
+            if (ga !== gb) return ga - gb;
+            return a.order - b.order;
+          });
 
         return { ...exam, chapterBreakdown };
       })
@@ -49,6 +101,107 @@ export async function listPublishedExams(request, response) {
   }
 }
 
+export async function getOfflineExamBundle(request, response) {
+  try {
+    const [publishedExams, allSubjects, allChapters] = await Promise.all([
+      Exam.find({ status: "published" })
+        .populate("subjectId", "name code stream gradeLevel")
+        .sort({ examYear: -1, createdAt: -1 })
+        .limit(60)
+        .lean(),
+      Subject.find({ isActive: true }).select("_id name code stream gradeLevel").lean(),
+      Chapter.find({ isActive: true }).select("_id title order subjectId").lean()
+    ]);
+
+    const chapterById = new Map(allChapters.map((c) => [String(c._id), c]));
+    const subjectById = new Map(allSubjects.map((s) => [String(s._id), s]));
+
+    // Collect up to 25 questions per exam across the most recent exams so offline bundle is fast and comprehensive
+    const targetQuestionIdSet = new Set();
+    const questionExamMap = new Map();
+    for (const exam of publishedExams) {
+      const qIds = Array.isArray(exam.questionIds) ? exam.questionIds.slice(0, 25) : [];
+      for (const qId of qIds) {
+        const key = String(qId);
+        targetQuestionIdSet.add(key);
+        if (!questionExamMap.has(key)) {
+          questionExamMap.set(key, {
+            examId: String(exam._id),
+            examYear: exam.examYear || 2016,
+            subjectId: exam.subjectId?._id ? String(exam.subjectId._id) : String(exam.subjectId || "")
+          });
+        }
+      }
+    }
+
+    const questionsRaw = await Question.find({
+      _id: { $in: Array.from(targetQuestionIdSet) },
+      isActive: true
+    }).lean();
+
+    const questions = questionsRaw.map((q) => {
+      const ch = q.chapterId ? chapterById.get(String(q.chapterId)) : null;
+      const meta = questionExamMap.get(String(q._id)) || {};
+      const chSubj = ch?.subjectId
+        ? subjectById.get(String(ch.subjectId))
+        : subjectById.get(String(q.subjectId || meta.subjectId || ""));
+      const resolvedTopic = q.topic || ch?.title || "General Curriculum Topic";
+      return {
+        _id: String(q._id),
+        examId: meta.examId || "",
+        subjectId: String(q.subjectId || meta.subjectId || ""),
+        chapterId: q.chapterId ? String(q.chapterId) : "",
+        chapterTitle: ch?.title || resolvedTopic,
+        chapterOrder: ch?.order ?? 999,
+        gradeLevel: chSubj?.gradeLevel || "grade-12",
+        subjectName: chSubj?.name || "",
+        examYear: Number(q.examYear || meta.examYear || 2016),
+        topic: resolvedTopic,
+        prompt: q.prompt || q.stem || "",
+        stem: q.stem || q.prompt || "",
+        passage: q.passage || "",
+        correctAnswer: q.correctAnswer || "A",
+        explanation: q.explanation || "",
+        options: (q.options || []).map((opt, idx) => {
+          const key =
+            typeof opt === "object" && opt !== null && opt.key
+              ? String(opt.key)
+              : String.fromCharCode(65 + idx);
+          return {
+            ...(typeof opt === "object" && opt !== null ? opt : { text: String(opt) }),
+            key
+          };
+        })
+      };
+    });
+
+    return response.json({
+      generatedAt: new Date().toISOString(),
+      examCount: publishedExams.length,
+      subjectCount: allSubjects.length,
+      chapterCount: allChapters.length,
+      questionCount: questions.length,
+      subjects: allSubjects,
+      chapters: allChapters,
+      exams: publishedExams.map((e) => ({
+        _id: String(e._id),
+        title: e.title,
+        description: e.description,
+        type: e.type,
+        examYear: e.examYear,
+        durationMinutes: e.durationMinutes,
+        passingScore: e.passingScore,
+        subjectId: e.subjectId,
+        questionIds: (e.questionIds || []).map(String)
+      })),
+      questions
+    });
+  } catch (error) {
+    console.error(error);
+    return response.status(500).json({ error: "Failed to build offline exam bundle." });
+  }
+}
+
 export async function updateExam(request, response) {
   try {
     const exam = await Exam.findById(request.params.examId);
@@ -56,12 +209,22 @@ export async function updateExam(request, response) {
     const { title, description, type, subjectId, chapterIds, questionIds, durationMinutes, passingScore, accessLevel, randomizeQuestions, randomizeOptions, examYear } = request.body;
     const nextSubjectId = subjectId || String(exam.subjectId);
     const nextQuestionIds = questionIds === undefined ? exam.questionIds.map(String) : [...new Set(questionIds.map(String))];
-    if (!title && title !== undefined || !mongoose.isValidObjectId(nextSubjectId) || !Array.isArray(nextQuestionIds) || !nextQuestionIds.length || !nextQuestionIds.every((id) => mongoose.isValidObjectId(id))) {
+    if ((!title && title !== undefined) || !mongoose.isValidObjectId(nextSubjectId) || !Array.isArray(nextQuestionIds) || !nextQuestionIds.length || !nextQuestionIds.every((id) => mongoose.isValidObjectId(id))) {
       return response.status(400).json({ error: "Title, an active subject, and at least one valid question are required." });
     }
     const subject = await Subject.findOne({ _id: nextSubjectId, isActive: true }).lean();
-    const questions = await Question.find({ _id: { $in: nextQuestionIds }, subjectId: nextSubjectId, isActive: true }).select("_id").lean();
-    if (!subject || questions.length !== nextQuestionIds.length) return response.status(400).json({ error: "All questions must be active and belong to the selected subject." });
+    if (!subject) return response.status(400).json({ error: "An active subject is required." });
+
+    const allowedSubjectIds = await getAllowedDisciplineSubjectIds(subject);
+    const questions = await Question.find({
+      _id: { $in: nextQuestionIds },
+      subjectId: { $in: allowedSubjectIds },
+      isActive: true
+    }).select("_id").lean();
+
+    if (questions.length !== nextQuestionIds.length) {
+      return response.status(400).json({ error: "All questions must be active and belong to the selected subject discipline." });
+    }
     const updates = { subjectId: nextSubjectId, questionIds: nextQuestionIds };
     if (examYear !== undefined && (!Number.isInteger(Number(examYear)) || Number(examYear) < 1900 || Number(examYear) > 3000)) {
       return response.status(400).json({ error: "Exam year must be a valid year." });
@@ -114,14 +277,15 @@ export async function createExam(request, response) {
       return response.status(400).json({ error: "An active subject is required." });
     }
 
+    const allowedSubjectIds = await getAllowedDisciplineSubjectIds(subject);
     const uniqueQuestionIds = [...new Set(questionIds.map(String))];
     const questions = await Question.find({
       _id: { $in: uniqueQuestionIds },
-      subjectId,
+      subjectId: { $in: allowedSubjectIds },
       isActive: true
     }).select("_id").lean();
     if (questions.length !== uniqueQuestionIds.length) {
-      return response.status(400).json({ error: "All questions must be active and belong to the selected subject." });
+      return response.status(400).json({ error: "All questions must be active and belong to the selected subject discipline." });
     }
 
     const exam = await Exam.create({
@@ -155,25 +319,30 @@ export async function publishExam(request, response) {
     }
 
     const subject = await Subject.findOne({ _id: exam.subjectId, isActive: true }).lean();
+    if (!subject) {
+      return response.status(400).json({ error: "Exam requires an active subject." });
+    }
+
+    const allowedSubjectIds = await getAllowedDisciplineSubjectIds(subject);
     const questionIds = [...new Set(exam.questionIds.map(String))];
     const questions = await Question.find({
       _id: { $in: questionIds },
-      subjectId: exam.subjectId,
+      subjectId: { $in: allowedSubjectIds },
       isActive: true
     }).select("_id chapterId").lean();
 
-    if (!subject || questions.length !== questionIds.length) {
-      return response.status(400).json({ error: "Exam requires an active subject and active questions from that subject." });
+    if (questions.length !== questionIds.length) {
+      return response.status(400).json({ error: "Exam requires an active subject and active questions from that discipline." });
     }
 
     if (exam.chapterIds.length > 0) {
       const chapters = await Chapter.find({
         _id: { $in: exam.chapterIds },
-        subjectId: exam.subjectId,
+        subjectId: { $in: allowedSubjectIds },
         isActive: true
       }).select("_id").lean();
       if (chapters.length !== exam.chapterIds.length) {
-        return response.status(400).json({ error: "All exam chapters must be active and belong to the subject." });
+        return response.status(400).json({ error: "All exam chapters must be active and belong to the subject discipline." });
       }
     }
 
@@ -226,7 +395,7 @@ export async function startExamAttempt(request, response) {
 
     if (exam.accessLevel === "premium") {
       const isStaff = ["admin", "teacher", "content_manager"].includes(request.user?.role);
-      const activeSubscription = isStaff || (await Subscription.exists({
+      const activeSubscription = isStaff || Boolean(request.user?.isPremium) || (await Subscription.exists({
         userId: request.user._id,
         status: "active",
         endsAt: { $gt: new Date() }
@@ -237,46 +406,96 @@ export async function startExamAttempt(request, response) {
       }
     }
 
+    const chapterId = request.query.chapterId || request.body?.chapterId;
+    const validChapterId = chapterId && mongoose.isValidObjectId(chapterId) ? chapterId : undefined;
+    const allYears = request.query.allYears === "true" || request.body?.allYears === true;
+
     const attempt = await ExamAttempt.create({
       userId: request.user._id,
       examId,
+      ...(validChapterId ? { chapterId: validChapterId } : {}),
       status: "in_progress"
     });
 
-    const chapterId = request.query.chapterId || request.body?.chapterId;
-    const questionFilter = { _id: { $in: exam.questionIds }, isActive: true };
+    // Map questionId -> examYear across published exams if allYears is requested
+    const questionYearMap = new Map();
+    let questionFilter = { _id: { $in: exam.questionIds }, isActive: true };
     let chapterDoc = null;
-    if (chapterId && mongoose.isValidObjectId(chapterId)) {
-      questionFilter.chapterId = chapterId;
-      chapterDoc = await Chapter.findById(chapterId).select("title order").lean();
+
+    if (validChapterId) {
+      chapterDoc = await Chapter.findById(validChapterId).select("title order subjectId").lean();
+      if (allYears) {
+        const publishedExams = await Exam.find({ status: "published" }).select("examYear questionIds").lean();
+        for (const pubEx of publishedExams) {
+          const yr = pubEx.examYear || 2016;
+          for (const qId of pubEx.questionIds || []) {
+            questionYearMap.set(String(qId), yr);
+          }
+        }
+        questionFilter = { chapterId: validChapterId, isActive: true };
+      } else {
+        questionFilter.chapterId = validChapterId;
+      }
     }
 
-    const questionsRaw = await Question.find(questionFilter)
-      .select("-correctAnswer")
-      .lean();
+    const [questionsRaw, allChapters, allSubjects] = await Promise.all([
+      Question.find(questionFilter).select("-correctAnswer").lean(),
+      Chapter.find().select("_id title order subjectId").lean(),
+      Subject.find().select("_id name code gradeLevel").lean()
+    ]);
 
-    // Normalise options to {key, text} objects for the frontend renderer
-    const questions = questionsRaw.map((q) => ({
-      ...q,
-      options: (q.options || []).map((opt, idx) =>
-        (() => {
-          const key = typeof opt === "object" && opt !== null && opt.key
-            ? String(opt.key)
-            : String.fromCharCode(65 + idx);
-          return {
-            ...(typeof opt === "object" && opt !== null ? opt : { text: String(opt) }),
-            key,
-            imageUrl: opt?.imageUrl || q.optionImages?.[key] || undefined
-          };
-        })()
-      )
-    }));
+    const chapterById = new Map(allChapters.map((c) => [String(c._id), c]));
+    const subjectById = new Map(allSubjects.map((s) => [String(s._id), s]));
+    const examSubj = subjectById.get(String(exam.subjectId));
+
+    // Normalise options to {key, text} objects and enrich with examYear + topic metadata
+    const questions = questionsRaw
+      .map((q) => {
+        const ch = q.chapterId ? chapterById.get(String(q.chapterId)) : chapterDoc;
+        const chSubj = ch?.subjectId ? subjectById.get(String(ch.subjectId)) : examSubj;
+        const resolvedYear = questionYearMap.get(String(q._id)) || q.examYear || exam.examYear || 2016;
+        const resolvedTopic = q.topic || ch?.title || chapterDoc?.title || "General Topic";
+        return {
+          ...q,
+          prompt: q.prompt || q.stem || "",
+          stem: q.stem || q.prompt || "",
+          examYear: Number(resolvedYear),
+          topic: resolvedTopic,
+          chapterId: q.chapterId ? String(q.chapterId) : (validChapterId ? String(validChapterId) : ""),
+          chapterTitle: ch?.title || resolvedTopic,
+          chapterOrder: ch?.order ?? 999,
+          gradeLevel: chSubj?.gradeLevel || examSubj?.gradeLevel || "grade-12",
+          subjectName: chSubj?.name || examSubj?.name || "",
+          options: (q.options || []).map((opt, idx) =>
+            (() => {
+              const key = typeof opt === "object" && opt !== null && opt.key
+                ? String(opt.key)
+                : String.fromCharCode(65 + idx);
+              return {
+                ...(typeof opt === "object" && opt !== null ? opt : { text: String(opt) }),
+                key,
+                imageUrl: opt?.imageUrl || q.optionImages?.[key] || undefined
+              };
+            })()
+          )
+        };
+      })
+      .sort((a, b) => {
+        if (b.examYear !== a.examYear) return b.examYear - a.examYear;
+        const ga = GRADE_SORT_ORDER[a.gradeLevel] ?? 99;
+        const gb = GRADE_SORT_ORDER[b.gradeLevel] ?? 99;
+        if (ga !== gb) return ga - gb;
+        return (a.chapterOrder ?? 999) - (b.chapterOrder ?? 999);
+      });
 
     const examObj = exam.toObject();
     if (chapterDoc) {
-      examObj.title = `${exam.title} • ${chapterDoc.title}`;
+      examObj.title = allYears
+        ? `${chapterDoc.title} (All Years)`
+        : `${exam.title} • ${chapterDoc.title}`;
       examObj.chapterName = chapterDoc.title;
       examObj.chapterId = String(chapterDoc._id);
+      examObj.allYears = Boolean(allYears);
     }
 
     return response.status(201).json({ attempt, exam: { ...examObj, questions } });
@@ -310,29 +529,39 @@ export async function submitExamAttempt(request, response) {
       return response.status(404).json({ error: "Exam not found." });
     }
 
-    const questions = await Question.find({ _id: { $in: exam.questionIds } })
-      .select("correctAnswer options")
+    const submittedIds = answers.map((a) => a.questionId).filter((id) => mongoose.isValidObjectId(id));
+    let questionQuery = { _id: { $in: exam.questionIds } };
+    if (attempt.chapterId) {
+      questionQuery = submittedIds.length > 0
+        ? { _id: { $in: submittedIds }, chapterId: attempt.chapterId }
+        : { _id: { $in: exam.questionIds }, chapterId: attempt.chapterId };
+    }
+
+    const questions = await Question.find(questionQuery)
+      .select("correctAnswer options explanation")
       .lean();
     const questionsById = new Map(questions.map((question) => [String(question._id), question]));
 
-    const gradedAnswers = answers.map((answer) => {
-      const question = questionsById.get(String(answer.questionId));
-      const submittedAnswer = answer.selectedOptionKeys?.[0] ?? answer.response;
-      const isCorrect = Boolean(
-        question &&
-        submittedAnswer !== undefined &&
-        String(submittedAnswer).trim().toLowerCase() === String(question.correctAnswer).trim().toLowerCase()
-      );
+    const gradedAnswers = answers
+      .filter((answer) => !attempt.chapterId || questionsById.has(String(answer.questionId)))
+      .map((answer) => {
+        const question = questionsById.get(String(answer.questionId));
+        const submittedAnswer = answer.selectedOptionKeys?.[0] ?? answer.response;
+        const isCorrect = Boolean(
+          question &&
+          submittedAnswer !== undefined &&
+          String(submittedAnswer).trim().toLowerCase() === String(question.correctAnswer).trim().toLowerCase()
+        );
 
-      return {
-        questionId: answer.questionId,
-        selectedOptionKeys: Array.isArray(answer.selectedOptionKeys) ? answer.selectedOptionKeys : [],
-        response: answer.response,
-        isCorrect,
-        pointsAwarded: isCorrect ? 1 : 0,
-        answeredAt: answer.answeredAt || new Date()
-      };
-    });
+        return {
+          questionId: answer.questionId,
+          selectedOptionKeys: Array.isArray(answer.selectedOptionKeys) ? answer.selectedOptionKeys : [],
+          response: answer.response,
+          isCorrect,
+          pointsAwarded: isCorrect ? 1 : 0,
+          answeredAt: answer.answeredAt || new Date()
+        };
+      });
 
     const score = gradedAnswers.reduce((total, answer) => total + answer.pointsAwarded, 0);
     const percentage = questions.length ? Math.round((score / questions.length) * 10000) / 100 : 0;
@@ -348,7 +577,11 @@ export async function submitExamAttempt(request, response) {
     const gradedAnswersById = new Map(
       gradedAnswers.map((answer) => [String(answer.questionId), answer])
     );
-    const questionResults = exam.questionIds.map((questionId) => {
+    const targetQuestionIds = attempt.chapterId
+      ? questions.map((q) => q._id)
+      : exam.questionIds;
+
+    const questionResults = targetQuestionIds.map((questionId) => {
       const question = questionsById.get(String(questionId));
       const gradedAnswer = gradedAnswersById.get(String(questionId));
       const selectedAnswer = gradedAnswer?.selectedOptionKeys?.[0] ?? gradedAnswer?.response;
@@ -370,6 +603,7 @@ export async function submitExamAttempt(request, response) {
         selectedAnswerText: optionText(selectedAnswer) || selectedAnswer,
         correctAnswer: question?.correctAnswer,
         correctAnswerText: optionText(question?.correctAnswer) || question?.correctAnswer,
+        explanation: question?.explanation || "",
         isCorrect: Boolean(gradedAnswer?.isCorrect)
       };
     });

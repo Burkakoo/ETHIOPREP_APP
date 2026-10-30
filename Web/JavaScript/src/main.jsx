@@ -28,10 +28,12 @@ import {
   LogOutIcon,
   MailIcon,
   MenuIcon,
+  MoonIcon,
   PlusIcon,
   ReceiptIcon,
   ShieldCheckIcon,
   SmartphoneIcon,
+  SunIcon,
   TrendingUpIcon,
   UsersIcon,
   WalletIcon,
@@ -43,16 +45,60 @@ import { ROLE_LABELS, roleBadge, statusBadge } from "./components/Badge.jsx";
 import { SkeletonStats, SkeletonTable } from "./components/Spinner.jsx";
 import { Notice } from "./components/Notice.jsx";
 import { Modal } from "./components/Modal.jsx";
+import { WeeklyPerformanceChart } from "./components/WeeklyPerformanceChart.jsx";
+import { MobileAppSimulator } from "./components/MobileAppSimulator.jsx";
+import { Overview } from "./pages/Overview.jsx";
 import { fmtDate, getGreeting } from "./utils/helpers.js";
 import "../../CSS/styles.css";
 
 const STAFF_ROLES = ["admin", "teacher", "content_manager", "cash_manager"];
 
+function ThemeToggleSwitch({ theme, onToggle, compact = false }) {
+  const isLight = theme === "light";
+  if (compact) {
+    return (
+      <button
+        type="button"
+        className="theme-toggle-compact"
+        onClick={onToggle}
+        role="switch"
+        aria-checked={isLight}
+        aria-label={`Switch to ${isLight ? "dark" : "light"} mode`}
+        title={`Switch to ${isLight ? "dark" : "light"} mode`}
+      >
+        {isLight ? <SunIcon size={17} /> : <MoonIcon size={17} />}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="theme-toggle-btn"
+      onClick={onToggle}
+      role="switch"
+      aria-checked={isLight}
+      aria-label={`Switch to ${isLight ? "dark" : "light"} mode`}
+      title={`Switch to ${isLight ? "dark" : "light"} mode`}
+    >
+      <span className="theme-toggle-label">
+        <span className="theme-toggle-icon">
+          {isLight ? <SunIcon size={16} /> : <MoonIcon size={16} />}
+        </span>
+        <span>{isLight ? "Light Mode" : "Dark Mode"}</span>
+      </span>
+      <span className={`theme-switch-track ${isLight ? "light" : ""}`} aria-hidden="true">
+        <span className="theme-switch-thumb" />
+      </span>
+    </button>
+  );
+}
+
 /* ════════════════════════════════════════════════════════════════
    AUTH
    ════════════════════════════════════════════════════════════════ */
 
-function Auth({ onLogin }) {
+function Auth({ onLogin, theme, onToggleTheme, onOpenMobileSimulator }) {
   const [step, setStep] = useState("login"); // "login" | "verify"
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [verifyEmail, setVerifyEmail] = useState("");
@@ -144,12 +190,15 @@ function Auth({ onLogin }) {
   return (
     <div className="auth-shell">
       <div className="auth-panel">
-        <div className="auth-logo">
-          <div className="logo-mark">E</div>
-          <div>
-            <div className="auth-logo-text">Ethio<span>Prep</span></div>
-            <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 1 }}>Staff &amp; Management Portal</div>
+        <div className="auth-logo" style={{ justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div className="logo-mark">E</div>
+            <div>
+              <div className="auth-logo-text">Ethio<span>Prep</span></div>
+              <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 1 }}>Staff &amp; Management Portal</div>
+            </div>
           </div>
+          <ThemeToggleSwitch theme={theme} onToggle={onToggleTheme} compact />
         </div>
 
         <div style={{
@@ -311,88 +360,70 @@ function Auth({ onLogin }) {
         }}>
           <SmartphoneIcon size={14} style={{ verticalAlign: "-2px", marginRight: 4 }} /><strong>Are you an entrance examination student?</strong><br />
           Students must use the <strong>EthioPrep Mobile Application</strong> to practice questions, study offline, take mock exams, and rank on the leaderboard.
+          {onOpenMobileSimulator && (
+            <div style={{ marginTop: 10 }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm btn-full"
+                onClick={onOpenMobileSimulator}
+                style={{ borderColor: "rgba(16, 185, 129, 0.4)", color: "#10b981" }}
+              >
+                <SmartphoneIcon size={15} /> Launch Interactive Mobile Student App
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-/* ════════════════════════════════════════════════════════════════
-   OVERVIEW (Dashboard Home)
-   ════════════════════════════════════════════════════════════════ */
-
-function Overview({ user, stats }) {
-  const items = [
-    { label: "Subjects", value: stats.subjects, icon: <BookOpenIcon size={18} strokeWidth={2} />, cls: "icon-green" },
-    { label: "Questions", value: stats.questions, icon: <CircleHelpIcon size={18} strokeWidth={2} />, cls: "icon-blue" },
-    { label: "Exams Published", value: stats.exams, icon: <FileTextIcon size={18} strokeWidth={2} />, cls: "icon-purple" },
-    { label: "Pending Payments", value: stats.pendingPayments, icon: <CreditCardIcon size={18} strokeWidth={2} />, cls: "icon-amber" },
-  ];
-
-  return (
-    <>
-      <div className="page-header">
-        <div className="breadcrumb"><span>Dashboard</span></div>
-        <h1>Good {getGreeting()}, {user.displayName.split(" ")[0]}</h1>
-        <p className="page-desc">Here's what's happening on EthioPrep right now.</p>
-      </div>
-      <div className="content-body">
-        <div className="stats-grid">
-          {items.map(s => (
-            <div key={s.label} className="stat-card">
-              <div className="stat-header">
-                <span className="stat-label">{s.label}</span>
-                <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
-              </div>
-              <div className="stat-value">{s.value ?? "—"}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="panel">
-          <div className="panel-header">
-            <span className="panel-title">Your Role & Permissions</span>
-          </div>
-          <div className="panel-body">
-            <table>
-              <thead><tr><th>Capability</th><th>Access</th></tr></thead>
-              <tbody>
-                {[
-                  ["Manage Subjects & Chapters", ["admin", "teacher", "content_manager"]],
-                  ["Create & Publish Exams", ["admin", "teacher", "content_manager"]],
-                  ["Manage Question Bank", ["admin", "teacher", "content_manager"]],
-                  ["Verify Payments", ["admin", "cash_manager"]],
-                  ["View Analytics", ["admin"]],
-                  ["Manage All Users", ["admin"]],
-                ].map(([cap, roles]) => (
-                  <tr key={cap}>
-                    <td>{cap}</td>
-                    <td>{roles.includes(user.role)
-                      ? <span className="badge badge-green"><CheckIcon size={12} /> Allowed</span>
-                      : <span className="badge badge-gray"><XIcon size={12} /> No Access</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
+/* Overview component imported from ./pages/Overview.jsx */
 
 /* ════════════════════════════════════════════════════════════════
    SUBJECTS PAGE
    ════════════════════════════════════════════════════════════════ */
 
+const GRADE_LEVEL_OPTIONS = [
+  { id: "", label: "All Grades" },
+  { id: "grade-9", label: "Grade 9" },
+  { id: "grade-10", label: "Grade 10" },
+  { id: "grade-11", label: "Grade 11" },
+  { id: "grade-12", label: "Grade 12" },
+  { id: "college", label: "College" }
+];
+
+function formatGradeLabel(gradeLevel) {
+  if (!gradeLevel) return "Grade 12";
+  const found = GRADE_LEVEL_OPTIONS.find((g) => g.id === String(gradeLevel));
+  if (found && found.id) return found.label;
+  return String(gradeLevel).replace("grade-", "Grade ");
+}
+
+function getDisciplinePrefix(subj) {
+  if (!subj) return "";
+  const code = String(subj.code || "").toUpperCase();
+  const name = String(subj.name || "").toLowerCase();
+  if (code.includes("BIO") || name.includes("bio")) return "BIO";
+  if (code.includes("CHEM") || name.includes("chem")) return "CHEM";
+  if (code.includes("PHYS") || name.includes("phys")) return "PHYS";
+  if (code.includes("MATH") || name.includes("math")) return "MATH";
+  if (code.includes("ENG") || name.includes("eng")) return "ENG";
+  if (code.includes("GEOG") || name.includes("geog")) return "GEOG";
+  if (code.includes("HIST") || name.includes("hist")) return "HIST";
+  if (code.includes("ECON") || name.includes("econ")) return "ECON";
+  if (code.includes("SAT") || name.includes("sat") || code.includes("APTITUDE")) return "SAT";
+  return code.split("_")[0] || code;
+}
+
 function SubjectsPage({ user }) {
   const [subjects, setSubjects] = useState([]);
+  const [gradeFilter, setGradeFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState({ text: "", type: "success" });
   const [showModal, setShowModal] = useState(false);
   const [editingSubject, setEditingSubject] = useState(null);
-  const [form, setForm] = useState({ name: "", code: "", description: "", gradeLevel: "", stream: "both" });
+  const [form, setForm] = useState({ name: "", code: "", description: "", gradeLevel: "grade-12", stream: "both" });
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -406,6 +437,11 @@ function SubjectsPage({ user }) {
 
   useEffect(() => { load(); }, [load]);
 
+  const filteredSubjects = useMemo(() => {
+    if (!gradeFilter) return subjects;
+    return subjects.filter((s) => (s.gradeLevel || "grade-12") === gradeFilter);
+  }, [subjects, gradeFilter]);
+
   async function saveSubject(e) {
     e.preventDefault();
     setSaving(true);
@@ -414,7 +450,7 @@ function SubjectsPage({ user }) {
       setMsg({ text: editingSubject ? "Subject updated successfully." : "Subject created successfully.", type: "success" });
       setShowModal(false);
       setEditingSubject(null);
-      setForm({ name: "", code: "", description: "", gradeLevel: "", stream: "both" });
+      setForm({ name: "", code: "", description: "", gradeLevel: "grade-12", stream: "both" });
       load();
     } catch (err) { setMsg({ text: err.message, type: "error" }); }
     finally { setSaving(false); }
@@ -422,7 +458,7 @@ function SubjectsPage({ user }) {
 
   function openEdit(subject) {
     setEditingSubject(subject);
-    setForm({ name: subject.name, code: subject.code, description: subject.description || "", gradeLevel: subject.gradeLevel || "", stream: subject.stream || "both" });
+    setForm({ name: subject.name, code: subject.code, description: subject.description || "", gradeLevel: subject.gradeLevel || "grade-12", stream: subject.stream || "both" });
     setShowModal(true);
   }
 
@@ -451,32 +487,45 @@ function SubjectsPage({ user }) {
         <div className="breadcrumb"><span>Content</span><span className="sep">›</span><span>Subjects</span></div>
         <div className="page-header-row">
           <div>
-            <h1>Subjects</h1>
-            <p className="page-desc">Manage exam subject categories for the question bank.</p>
+            <h1>Subjects &amp; Courses</h1>
+            <p className="page-desc">Manage Grade 9–12 and college subject categories for the question bank.</p>
           </div>
-          {canManage && <button className="btn btn-primary" onClick={() => { setEditingSubject(null); setForm({ name: "", code: "", description: "", gradeLevel: "", stream: "both" }); setShowModal(true); }}><PlusIcon size={16} /> New Subject</button>}
+          {canManage && <button className="btn btn-primary" onClick={() => { setEditingSubject(null); setForm({ name: "", code: "", description: "", gradeLevel: gradeFilter || "grade-12", stream: "both" }); setShowModal(true); }}><PlusIcon size={16} /> New Subject</button>}
         </div>
       </div>
       <div className="content-body">
         <Notice text={msg.text} type={msg.type} onClose={() => setMsg({ text: "" })} />
         <div className="panel">
-          <div className="panel-header">
-            <span className="panel-title">All Subjects ({subjects.length})</span>
+          <div className="panel-header" style={{ flexWrap: "wrap", gap: 12 }}>
+            <span className="panel-title">Subjects ({filteredSubjects.length})</span>
+            <div className="filter-bar">
+              {GRADE_LEVEL_OPTIONS.map((g) => (
+                <button
+                  key={g.id || "all"}
+                  type="button"
+                  className={`btn btn-sm ${gradeFilter === g.id ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => setGradeFilter(g.id)}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
           </div>
           {loading ? <SkeletonTable /> : (
             <div className="table-wrap">
               <table>
                 <thead>
-                  <tr><th>Name</th><th>Code</th><th>Grade</th><th>Description</th><th>Status</th>{canManage && <th></th>}</tr>
+                  <tr><th>Name</th><th>Code</th><th>Grade Level</th><th>Stream</th><th>Description</th><th>Status</th>{canManage && <th></th>}</tr>
                 </thead>
                 <tbody>
-                  {subjects.length === 0 ? (
-                    <tr><td colSpan={6}><div className="empty-state"><div className="empty-icon"><BookOpenIcon size={26} strokeWidth={1.75} /></div><h3>No subjects yet</h3><p>Create your first subject to start building the question bank.</p></div></td></tr>
-                  ) : subjects.map(s => (
+                  {filteredSubjects.length === 0 ? (
+                    <tr><td colSpan={7}><div className="empty-state"><div className="empty-icon"><BookOpenIcon size={26} strokeWidth={1.75} /></div><h3>No subjects found</h3><p>Create a subject for this grade level to start building the question bank.</p></div></td></tr>
+                  ) : filteredSubjects.map(s => (
                     <tr key={s._id}>
                       <td><strong>{s.name}</strong></td>
                       <td><span className="badge badge-blue">{s.code}</span></td>
-                      <td className="td-muted">{s.gradeLevel || "—"}</td>
+                      <td><span className="badge badge-purple">{formatGradeLabel(s.gradeLevel)}</span></td>
+                      <td><span className={`badge ${s.stream === "natural" ? "badge-green" : s.stream === "social" ? "badge-amber" : "badge-gray"}`}>{s.stream === "natural" ? "Natural" : s.stream === "social" ? "Social" : "Both"}</span></td>
                       <td className="td-muted">{s.description || "—"}</td>
                       <td>{statusBadge(s.isActive ? "active" : "archived")}</td>
                       {canManage && <td><div className="td-actions"><button className="btn btn-sm btn-secondary" onClick={() => openEdit(s)}>Edit</button>{s.isActive ? <button className="btn btn-sm btn-danger" onClick={() => deactivate(s._id)}>Deactivate</button> : <button className="btn btn-sm btn-success" onClick={() => reactivate(s._id)}>Reactivate</button>}</div></td>}
@@ -500,27 +549,28 @@ function SubjectsPage({ user }) {
               <div className="modal-body">
                 <div className="form-grid">
                   <div className="form-row">
-                    <div className="field"><label>Subject Name *</label><input required placeholder="e.g. Mathematics" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
-                    <div className="field"><label>Code *</label><input required placeholder="e.g. MATH" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} /></div>
+                    <div className="field"><label>Subject Name *</label><input required placeholder="e.g. Biology" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
+                    <div className="field"><label>Code *</label><input required placeholder="e.g. BIO_9" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} /></div>
                   </div>
-                  <div className="field">
-                    <label>Stream *</label>
-                    <select value={form.stream} onChange={e => setForm({ ...form, stream: e.target.value })}>
-                      <option value="both">Both streams</option>
-                      <option value="natural">Natural Science</option>
-                      <option value="social">Social Science</option>
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label>Grade Level</label>
-                    <select value={form.gradeLevel} onChange={e => setForm({ ...form, gradeLevel: e.target.value })}>
-                      <option value="">Use system default (Grade 12)</option>
-                      <option value="grade-9">Grade 9</option>
-                      <option value="grade-10">Grade 10</option>
-                      <option value="grade-11">Grade 11</option>
-                      <option value="grade-12">Grade 12</option>
-                      <option value="college">College</option>
-                    </select>
+                  <div className="form-row">
+                    <div className="field">
+                      <label>Grade Level *</label>
+                      <select required value={form.gradeLevel} onChange={e => setForm({ ...form, gradeLevel: e.target.value })}>
+                        <option value="grade-9">Grade 9</option>
+                        <option value="grade-10">Grade 10</option>
+                        <option value="grade-11">Grade 11</option>
+                        <option value="grade-12">Grade 12</option>
+                        <option value="college">College</option>
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label>Stream *</label>
+                      <select value={form.stream} onChange={e => setForm({ ...form, stream: e.target.value })}>
+                        <option value="both">Both streams</option>
+                        <option value="natural">Natural Science</option>
+                        <option value="social">Social Science</option>
+                      </select>
+                    </div>
                   </div>
                   <div className="field"><label>Description</label><textarea placeholder="Brief description of this subject…" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
                 </div>
@@ -544,22 +594,40 @@ function SubjectsPage({ user }) {
 function QuestionsPage({ user }) {
   const [subjects, setSubjects] = useState([]);
   const [questions, setQuestions] = useState([]);
+  const [filterGrade, setFilterGrade] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ text: "", type: "success" });
   const [showModal, setShowModal] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [modalGrade, setModalGrade] = useState("");
   const [form, setForm] = useState({
     subjectId: "", chapterId: "", prompt: "", correctAnswer: "",
     explanation: "", imageUrl: "", optionImages: {}, explanationImageUrl: "", difficulty: "medium", questionType: "multiple_choice",
     options: ["", "", "", ""],
   });
   const [chapters, setChapters] = useState([]);
+  const [allChaptersMap, setAllChaptersMap] = useState({});
   const canManage = ["admin", "teacher", "content_manager"].includes(user.role);
 
   useEffect(() => {
-    apiRequest("/question-bank/subjects?includeInactive=true").then(r => setSubjects(r.subjects)).catch(() => {});
+    apiRequest("/question-bank/subjects?includeInactive=true").then(r => {
+      setSubjects(r.subjects);
+      Promise.all(
+        (r.subjects || []).map(s =>
+          apiRequest(`/question-bank/subjects/${s._id}/chapters?includeInactive=true`)
+            .then(cr => cr.chapters || [])
+            .catch(() => [])
+        )
+      ).then(lists => {
+        const map = {};
+        for (const list of lists) {
+          for (const ch of list) map[String(ch._id)] = ch;
+        }
+        setAllChaptersMap(map);
+      });
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -568,15 +636,27 @@ function QuestionsPage({ user }) {
     } else { setChapters([]); }
   }, [form.subjectId]);
 
+  const gradeFilteredSubjects = useMemo(() => {
+    if (!filterGrade) return subjects;
+    return subjects.filter(s => (s.gradeLevel || "grade-12") === filterGrade);
+  }, [subjects, filterGrade]);
+
+  const modalFilteredSubjects = useMemo(() => {
+    if (!modalGrade) return subjects;
+    return subjects.filter(s => (s.gradeLevel || "grade-12") === modalGrade);
+  }, [subjects, modalGrade]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const q = filterSubject ? `?subjectId=${filterSubject}&includeInactive=true` : "?includeInactive=true";
-      const res = await apiRequest(`/question-bank/questions${q}`);
+      const params = new URLSearchParams({ includeInactive: "true" });
+      if (filterSubject) params.set("subjectId", filterSubject);
+      else if (filterGrade) params.set("gradeLevel", filterGrade);
+      const res = await apiRequest(`/question-bank/questions?${params.toString()}`);
       setQuestions(res.questions);
     } catch (e) { setMsg({ text: e.message, type: "error" }); }
     finally { setLoading(false); }
-  }, [filterSubject]);
+  }, [filterSubject, filterGrade]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -601,6 +681,8 @@ function QuestionsPage({ user }) {
 
   function openEdit(question) {
     setEditingQuestion(question);
+    const subj = subjects.find(s => String(s._id) === String(question.subjectId));
+    setModalGrade(subj?.gradeLevel || "");
     setForm({ subjectId: String(question.subjectId), chapterId: question.chapterId ? String(question.chapterId) : "", prompt: question.prompt, correctAnswer: question.correctAnswer || "", explanation: question.explanation || "", imageUrl: question.imageUrl || "", optionImages: question.optionImages || {}, explanationImageUrl: question.explanationImageUrl || "", difficulty: question.difficulty || "medium", questionType: question.questionType || "multiple_choice", options: [...(question.options || []), "", "", "", ""].slice(0, 4) });
     setShowModal(true);
   }
@@ -637,19 +719,31 @@ function QuestionsPage({ user }) {
       <div className="page-header">
         <div className="breadcrumb"><span>Content</span><span className="sep">›</span><span>Question Bank</span></div>
         <div className="page-header-row">
-          <div><h1>Question Bank</h1><p className="page-desc">Create and manage questions for all subjects.</p></div>
-          {canManage && <button className="btn btn-primary" onClick={() => { setEditingQuestion(null); setForm({ subjectId: "", chapterId: "", prompt: "", correctAnswer: "", explanation: "", imageUrl: "", optionImages: {}, explanationImageUrl: "", difficulty: "medium", questionType: "multiple_choice", options: ["", "", "", ""] }); setShowModal(true); }}><PlusIcon size={16} /> New Question</button>}
+          <div><h1>Question Bank</h1><p className="page-desc">Create and manage questions mapped to Grade 9–12 curriculum units.</p></div>
+          {canManage && <button className="btn btn-primary" onClick={() => { setEditingQuestion(null); setModalGrade(filterGrade || ""); setForm({ subjectId: filterSubject || "", chapterId: "", prompt: "", correctAnswer: "", explanation: "", imageUrl: "", optionImages: {}, explanationImageUrl: "", difficulty: "medium", questionType: "multiple_choice", options: ["", "", "", ""] }); setShowModal(true); }}><PlusIcon size={16} /> New Question</button>}
         </div>
       </div>
       <div className="content-body">
         <Notice text={msg.text} type={msg.type} onClose={() => setMsg({ text: "" })} />
         <div className="panel">
-          <div className="panel-header">
+          <div className="panel-header" style={{ flexWrap: "wrap", gap: 12 }}>
             <span className="panel-title">Questions ({questions.length})</span>
-            <div className="panel-actions">
-              <select value={filterSubject} onChange={e => setFilterSubject(e.target.value)} style={{ width: 180 }}>
+            <div className="panel-actions" style={{ flexWrap: "wrap", gap: 8 }}>
+              <div className="filter-bar">
+                {GRADE_LEVEL_OPTIONS.map((g) => (
+                  <button
+                    key={g.id || "all"}
+                    type="button"
+                    className={`btn btn-sm ${filterGrade === g.id ? "btn-primary" : "btn-secondary"}`}
+                    onClick={() => { setFilterGrade(g.id); setFilterSubject(""); }}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+              <select value={filterSubject} onChange={e => setFilterSubject(e.target.value)} style={{ width: 220 }}>
                 <option value="">All subjects</option>
-                {subjects.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+                {gradeFilteredSubjects.map(s => <option key={s._id} value={s._id}>{s.name} ({formatGradeLabel(s.gradeLevel)} - {s.code})</option>)}
               </select>
             </div>
           </div>
@@ -657,20 +751,22 @@ function QuestionsPage({ user }) {
             <div className="table-wrap">
               <table>
                 <thead>
-                  <tr><th>#</th><th>Prompt</th><th>Type</th><th>Difficulty</th><th>Subject</th><th>Status</th>{canManage && <th></th>}</tr>
+                  <tr><th>#</th><th>Prompt</th><th>Grade</th><th>Subject</th><th>Unit / Chapter</th><th>Difficulty</th><th>Status</th>{canManage && <th></th>}</tr>
                 </thead>
                 <tbody>
                   {questions.length === 0 ? (
-                    <tr><td colSpan={7}><div className="empty-state"><div className="empty-icon"><CircleHelpIcon size={26} strokeWidth={1.75} /></div><h3>No questions found</h3><p>Add questions to start building exams.</p></div></td></tr>
+                    <tr><td colSpan={8}><div className="empty-state"><div className="empty-icon"><CircleHelpIcon size={26} strokeWidth={1.75} /></div><h3>No questions found</h3><p>Add questions to start building exams.</p></div></td></tr>
                   ) : questions.map((q, i) => {
-                    const subj = subjects.find(s => s._id === String(q.subjectId));
+                    const subj = subjects.find(s => String(s._id) === String(q.subjectId));
+                    const chap = q.chapterId ? allChaptersMap[String(q.chapterId)] : null;
                     return (
                       <tr key={q._id}>
                         <td className="td-muted">{i + 1}</td>
-                        <td style={{ maxWidth: 320 }}><span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.prompt}</span></td>
-                        <td><span className="badge badge-blue">{q.questionType?.replace(/_/g, " ")}</span></td>
+                        <td style={{ maxWidth: 300 }}><span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.prompt}</span></td>
+                        <td><span className="badge badge-purple">{formatGradeLabel(subj?.gradeLevel)}</span></td>
+                        <td><strong>{subj?.name || "—"}</strong> <span className="td-muted" style={{ fontSize: 11 }}>({subj?.code || ""})</span></td>
+                        <td className="td-muted">{chap ? `Unit ${chap.order}: ${chap.title}` : "General"}</td>
                         <td>{statusBadge(q.difficulty)}</td>
-                        <td className="td-muted">{subj?.name || "—"}</td>
                         <td>{statusBadge(q.isActive ? "active" : "archived")}</td>
                         {canManage && <td><div className="td-actions"><button className="btn btn-sm btn-secondary" onClick={() => openEdit(q)}>Edit</button>{q.isActive ? <button className="btn btn-sm btn-danger" onClick={() => deactivate(q._id)}>Deactivate</button> : <button className="btn btn-sm btn-success" onClick={() => reactivate(q._id)}>Reactivate</button>}</div></td>}
                       </tr>
@@ -695,19 +791,25 @@ function QuestionsPage({ user }) {
                 <div className="form-grid">
                   <div className="form-row">
                     <div className="field">
-                      <label>Subject *</label>
-                      <select required value={form.subjectId} onChange={e => setForm({ ...form, subjectId: e.target.value, chapterId: "" })}>
-                        <option value="">Select subject</option>
-                        {subjects.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+                      <label>Grade Level Filter</label>
+                      <select value={modalGrade} onChange={e => { setModalGrade(e.target.value); setForm({ ...form, subjectId: "", chapterId: "" }); }}>
+                        {GRADE_LEVEL_OPTIONS.map(g => <option key={g.id || "all"} value={g.id}>{g.label}</option>)}
                       </select>
                     </div>
                     <div className="field">
-                      <label>Chapter</label>
-                      <select value={form.chapterId} onChange={e => setForm({ ...form, chapterId: e.target.value })} disabled={!chapters.length}>
-                        <option value="">No chapter</option>
-                        {chapters.map(c => <option key={c._id} value={c._id}>{c.title}</option>)}
+                      <label>Subject *</label>
+                      <select required value={form.subjectId} onChange={e => setForm({ ...form, subjectId: e.target.value, chapterId: "" })}>
+                        <option value="">Select subject</option>
+                        {modalFilteredSubjects.map(s => <option key={s._id} value={s._id}>{s.name} ({formatGradeLabel(s.gradeLevel)} - {s.code})</option>)}
                       </select>
                     </div>
+                  </div>
+                  <div className="field">
+                    <label>Curriculum Unit / Chapter</label>
+                    <select value={form.chapterId} onChange={e => setForm({ ...form, chapterId: e.target.value })} disabled={!chapters.length}>
+                      <option value="">No specific chapter (General)</option>
+                      {chapters.map(c => <option key={c._id} value={c._id}>Unit {c.order}: {c.title}</option>)}
+                    </select>
                   </div>
                   <div className="form-row">
                     <div className="field">
@@ -825,6 +927,9 @@ function ExamsPage({ user }) {
   const [exams, setExams] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [questions, setQuestions] = useState([]);
+  const [yearFilter, setYearFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [questionGradeTab, setQuestionGradeTab] = useState("");
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState({ text: "", type: "success" });
   const [showModal, setShowModal] = useState(false);
@@ -841,10 +946,31 @@ function ExamsPage({ user }) {
   }, []);
 
   useEffect(() => {
-    if (form.subjectId) {
+    if (!form.subjectId) {
+      setQuestions([]);
+      return;
+    }
+    const primarySubj = subjects.find(s => String(s._id) === String(form.subjectId));
+    const disc = getDisciplinePrefix(primarySubj);
+    const matchingSubjects = disc
+      ? subjects.filter(s => getDisciplinePrefix(s) === disc)
+      : (primarySubj ? [primarySubj] : []);
+
+    if (matchingSubjects.length === 0) {
       apiRequest(`/question-bank/questions?subjectId=${form.subjectId}`).then(r => setQuestions(r.questions)).catch(() => setQuestions([]));
-    } else { setQuestions([]); }
-  }, [form.subjectId]);
+      return;
+    }
+
+    Promise.all(
+      matchingSubjects.map(s =>
+        apiRequest(`/question-bank/questions?subjectId=${s._id}`)
+          .then(r => (r.questions || []).map(q => ({ ...q, _gradeLevel: s.gradeLevel || "grade-12", _subjectCode: s.code })))
+          .catch(() => [])
+      )
+    ).then(lists => {
+      setQuestions(lists.flat());
+    });
+  }, [form.subjectId, subjects]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -856,6 +982,23 @@ function ExamsPage({ user }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const filteredExams = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return exams.filter(ex => {
+      if (yearFilter && String(ex.examYear || "") !== String(yearFilter)) return false;
+      if (!q) return true;
+      const titleMatch = String(ex.title || "").toLowerCase().includes(q);
+      const subjMatch = String(ex.subjectId?.name || "").toLowerCase().includes(q);
+      const yearMatch = String(ex.examYear || "").toLowerCase().includes(q);
+      return titleMatch || subjMatch || yearMatch;
+    });
+  }, [exams, yearFilter, searchQuery]);
+
+  const visibleModalQuestions = useMemo(() => {
+    if (!questionGradeTab) return questions;
+    return questions.filter(q => (q._gradeLevel || "grade-12") === questionGradeTab);
+  }, [questions, questionGradeTab]);
 
   async function saveExam(e) {
     e.preventDefault();
@@ -874,6 +1017,7 @@ function ExamsPage({ user }) {
 
   function openEdit(exam) {
     setEditingExam(exam);
+    setQuestionGradeTab("");
     const titleYear = exam.title.match(/\b(?:19|20)\d{2}\b/)?.[0] || "";
     setForm({ title: exam.title, description: exam.description || "", subjectId: String(exam.subjectId?._id || exam.subjectId), examYear: exam.examYear || titleYear, durationMinutes: exam.durationMinutes, passingScore: exam.passingScore, accessLevel: exam.accessLevel, questionIds: (exam.questionIds || []).map(String) });
     setShowModal(true);
@@ -914,14 +1058,60 @@ function ExamsPage({ user }) {
       <div className="page-header">
         <div className="breadcrumb"><span>Content</span><span className="sep">›</span><span>Exams</span></div>
         <div className="page-header-row">
-          <div><h1>Exams</h1><p className="page-desc">Create, publish, and archive practice exams for students.</p></div>
-          {canManage && <button className="btn btn-primary" onClick={() => { setEditingExam(null); setForm({ title: "", description: "", subjectId: "", examYear: "", durationMinutes: 60, passingScore: 50, accessLevel: "free", questionIds: [] }); setShowModal(true); }}><PlusIcon size={16} /> New Exam</button>}
+          <div><h1>Exams</h1><p className="page-desc">Create, publish, and archive multi-grade entrance and practice exams.</p></div>
+          {canManage && <button className="btn btn-primary" onClick={() => { setEditingExam(null); setQuestionGradeTab(""); setForm({ title: "", description: "", subjectId: "", examYear: "", durationMinutes: 60, passingScore: 50, accessLevel: "free", questionIds: [] }); setShowModal(true); }}><PlusIcon size={16} /> New Exam</button>}
         </div>
       </div>
       <div className="content-body">
         <Notice text={msg.text} type={msg.type} onClose={() => setMsg({ text: "" })} />
         <div className="panel">
-          <div className="panel-header"><span className="panel-title">All Exams ({exams.length})</span></div>
+          <div className="panel-header" style={{ flexWrap: "wrap", gap: 12 }}>
+            <span className="panel-title">All Exams ({filteredExams.length})</span>
+            <div className="filter-bar" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ position: "relative", minWidth: 260 }}>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search exams by title..."
+                  aria-label="Search exams by title"
+                  style={{ width: "100%", paddingRight: searchQuery ? 30 : 12 }}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    aria-label="Clear search"
+                    style={{
+                      position: "absolute",
+                      right: 8,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "var(--text-muted)",
+                      fontWeight: 700,
+                      fontSize: 15,
+                      padding: "0 4px"
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              {["", "2013", "2014", "2015", "2016", "2017", "2018"].map(yr => (
+                <button
+                  key={yr || "all"}
+                  type="button"
+                  className={`btn btn-sm ${yearFilter === yr ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => setYearFilter(yr)}
+                >
+                  {yr ? `${yr} E.C.` : "All Years"}
+                </button>
+              ))}
+            </div>
+          </div>
           {loading ? <SkeletonTable /> : (
             <div className="table-wrap">
               <table>
@@ -929,9 +1119,9 @@ function ExamsPage({ user }) {
                   <tr><th>Title</th><th>Subject</th><th>Exam Year</th><th>Duration</th><th>Questions</th><th>Pass Score</th><th>Access</th><th>Status</th>{canManage && <th>Actions</th>}</tr>
                 </thead>
                 <tbody>
-                  {exams.length === 0 ? (
-                    <tr><td colSpan={9}><div className="empty-state"><div className="empty-icon"><FileTextIcon size={26} strokeWidth={1.75} /></div><h3>No exams yet</h3><p>Create your first exam to make it available to students.</p></div></td></tr>
-                  ) : exams.map(ex => (
+                  {filteredExams.length === 0 ? (
+                    <tr><td colSpan={9}><div className="empty-state"><div className="empty-icon"><FileTextIcon size={26} strokeWidth={1.75} /></div><h3>No exams found</h3><p>{searchQuery.trim() ? `No exams matched "${searchQuery.trim()}".` : "Create your first exam to make it available to students."}</p></div></td></tr>
+                  ) : filteredExams.map(ex => (
                     <tr key={ex._id}>
                       <td><strong>{ex.title}</strong><div className="td-muted" style={{ fontSize: 12, marginTop: 2 }}>{ex.description || ""}</div></td>
                       <td className="td-muted">{ex.subjectId?.name || "—"}</td>
@@ -975,7 +1165,7 @@ function ExamsPage({ user }) {
                       <label>Subject *</label>
                       <select required value={form.subjectId} onChange={e => setForm({ ...form, subjectId: e.target.value, questionIds: [] })}>
                         <option value="">Select subject</option>
-                        {subjects.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+                        {subjects.map(s => <option key={s._id} value={s._id}>{s.name} ({formatGradeLabel(s.gradeLevel)} - {s.code})</option>)}
                       </select>
                     </div>
                     <div className="field">
@@ -994,14 +1184,36 @@ function ExamsPage({ user }) {
 
                   {form.subjectId && (
                     <div className="field">
-                      <label>Select Questions ({form.questionIds.length} selected) *</label>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
+                        <label style={{ margin: 0 }}>Select Questions ({form.questionIds.length} selected) *</label>
+                        <div className="filter-bar">
+                          {GRADE_LEVEL_OPTIONS.filter(g => g.id !== "college").map(g => {
+                            const countInGrade = g.id
+                              ? questions.filter(q => (q._gradeLevel || "grade-12") === g.id && form.questionIds.includes(String(q._id))).length
+                              : form.questionIds.length;
+                            return (
+                              <button
+                                key={g.id || "all"}
+                                type="button"
+                                className={`btn btn-sm ${questionGradeTab === g.id ? "btn-primary" : "btn-secondary"}`}
+                                onClick={() => setQuestionGradeTab(g.id)}
+                              >
+                                {g.label} ({countInGrade})
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                       <div style={{ maxHeight: 240, overflowY: "auto", border: "1.5px solid var(--border)", borderRadius: "var(--radius-md)", padding: 8, display: "grid", gap: 4 }}>
-                        {questions.length === 0
-                          ? <p style={{ color: "var(--text-3)", padding: 8, textAlign: "center" }}>No questions for this subject yet.</p>
-                          : questions.map((q, i) => (
-                            <label key={q._id} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "6px 8px", borderRadius: 6, cursor: "pointer", background: form.questionIds.includes(q._id) ? "var(--green-bg)" : "transparent" }}>
-                              <input type="checkbox" checked={form.questionIds.includes(q._id)} onChange={() => toggleQuestion(q._id)} style={{ width: "auto", marginTop: 2 }} />
-                              <span style={{ fontSize: 13 }}>{i + 1}. {q.prompt}</span>
+                        {visibleModalQuestions.length === 0
+                          ? <p style={{ color: "var(--text-3)", padding: 8, textAlign: "center" }}>No questions for this grade/subject yet.</p>
+                          : visibleModalQuestions.map((q, i) => (
+                            <label key={q._id} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "6px 8px", borderRadius: 6, cursor: "pointer", background: form.questionIds.includes(String(q._id)) ? "var(--green-bg)" : "transparent" }}>
+                              <input type="checkbox" checked={form.questionIds.includes(String(q._id))} onChange={() => toggleQuestion(String(q._id))} style={{ width: "auto", marginTop: 2 }} />
+                              <span style={{ fontSize: 13 }}>
+                                <span className="badge badge-purple" style={{ marginRight: 6 }}>{formatGradeLabel(q._gradeLevel)}</span>
+                                {i + 1}. {q.prompt}
+                              </span>
                             </label>
                           ))
                         }
@@ -1877,6 +2089,8 @@ function AnalyticsPage() {
               </div>
             )}
 
+            <WeeklyPerformanceChart />
+
             <div className="panel">
               <div className="panel-header"><span className="panel-title">Recent Activity Trends</span></div>
               <div className="panel-body">
@@ -1917,6 +2131,7 @@ function AnalyticsPage() {
 
 function ChaptersPage({ user }) {
   const [subjects, setSubjects] = useState([]);
+  const [gradeFilter, setGradeFilter] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("");
   const [chapters, setChapters] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -1930,6 +2145,11 @@ function ChaptersPage({ user }) {
   useEffect(() => {
     apiRequest("/question-bank/subjects?includeInactive=true").then(r => setSubjects(r.subjects)).catch(() => {});
   }, []);
+
+  const filteredSubjects = useMemo(() => {
+    if (!gradeFilter) return subjects;
+    return subjects.filter(s => (s.gradeLevel || "grade-12") === gradeFilter);
+  }, [subjects, gradeFilter]);
 
   useEffect(() => {
     if (!selectedSubject) { setChapters([]); return; }
@@ -1984,18 +2204,32 @@ function ChaptersPage({ user }) {
       <div className="page-header">
         <div className="breadcrumb"><span>Content</span><span className="sep">›</span><span>Chapters</span></div>
         <div className="page-header-row">
-          <div><h1>Chapters</h1><p className="page-desc">Organise subjects into chapters for structured learning.</p></div>
-          {canManage && selectedSubject && <button className="btn btn-primary" onClick={() => { setEditingChapter(null); setForm({ title: "", description: "", order: 1 }); setShowModal(true); }}><PlusIcon size={16} /> New Chapter</button>}
+          <div><h1>Chapters</h1><p className="page-desc">Organise Grade 9–12 subjects into curriculum chapters for structured learning.</p></div>
+          {canManage && selectedSubject && <button className="btn btn-primary" onClick={() => { setEditingChapter(null); setForm({ title: "", description: "", order: chapters.length + 1 }); setShowModal(true); }}><PlusIcon size={16} /> New Chapter</button>}
         </div>
       </div>
       <div className="content-body">
         <Notice text={msg.text} type={msg.type} onClose={() => setMsg({ text: "" })} />
         <div className="panel" style={{ marginBottom: 20 }}>
-          <div className="panel-header"><span className="panel-title">Select Subject</span></div>
+          <div className="panel-header" style={{ flexWrap: "wrap", gap: 12 }}>
+            <span className="panel-title">Select Grade &amp; Subject</span>
+            <div className="filter-bar">
+              {GRADE_LEVEL_OPTIONS.map((g) => (
+                <button
+                  key={g.id || "all"}
+                  type="button"
+                  className={`btn btn-sm ${gradeFilter === g.id ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => { setGradeFilter(g.id); setSelectedSubject(""); }}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="panel-body">
-            <select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} style={{ maxWidth: 320 }}>
+            <select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} style={{ maxWidth: 380 }}>
               <option value="">— Choose a subject —</option>
-              {subjects.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+              {filteredSubjects.map(s => <option key={s._id} value={s._id}>{s.name} ({formatGradeLabel(s.gradeLevel)} - {s.code})</option>)}
             </select>
           </div>
         </div>
@@ -2055,7 +2289,7 @@ function ChaptersPage({ user }) {
    DASHBOARD SHELL — SIDEBAR + ROUTING
    ════════════════════════════════════════════════════════════════ */
 
-function Dashboard({ user, onLogout }) {
+function Dashboard({ user, onLogout, theme, onToggleTheme }) {
   const [page, setPage] = useState("overview");
   const [navOpen, setNavOpen] = useState(false);
 
@@ -2071,7 +2305,7 @@ function Dashboard({ user, onLogout }) {
     // Load overview stats in background
     Promise.all([
       apiRequest("/question-bank/subjects").then(r => r.subjects.length).catch(() => 0),
-      apiRequest("/question-bank/questions").then(r => r.questions.length).catch(() => 0),
+      apiRequest("/question-bank/questions").then(r => r.totalCount ?? r.questions.length).catch(() => 0),
       apiRequest("/exams").then(r => r.exams.length).catch(() => 0),
       apiRequest("/payments/dashboard").then(r => r.pendingPayments).catch(() => 0),
     ]).then(([subjects, questions, exams, pendingPayments]) => {
@@ -2102,20 +2336,23 @@ function Dashboard({ user, onLogout }) {
       { id: "users",     label: "Users",          icon: <UsersIcon size={18} strokeWidth={2} /> },
       { id: "analytics", label: "Analytics",      icon: <BarChart3Icon size={18} strokeWidth={2} /> },
     ] : []),
+    { section: "Student Experience" },
+    { id: "mobile-app", label: "Mobile Student App", icon: <SmartphoneIcon size={18} strokeWidth={2} /> },
   ];
 
   function renderPage() {
     switch (page) {
-      case "overview":  return <Overview user={user} stats={stats} />;
-      case "subjects":  return <SubjectsPage user={user} />;
-      case "chapters":  return <ChaptersPage user={user} />;
-      case "questions": return <QuestionsPage user={user} />;
-      case "exams":     return <ExamsPage user={user} />;
-      case "notes":     return <StaffNotesPage user={user} />;
-      case "payments":  return <PaymentsPage user={user} />;
-      case "users":     return <UsersPage />;
-      case "analytics": return <AnalyticsPage />;
-      default:          return <Overview user={user} stats={stats} />;
+      case "overview":   return <Overview user={user} stats={stats} />;
+      case "subjects":   return <SubjectsPage user={user} />;
+      case "chapters":   return <ChaptersPage user={user} />;
+      case "questions":  return <QuestionsPage user={user} />;
+      case "exams":      return <ExamsPage user={user} />;
+      case "notes":      return <StaffNotesPage user={user} />;
+      case "payments":   return <PaymentsPage user={user} />;
+      case "users":      return <UsersPage />;
+      case "analytics":  return <AnalyticsPage />;
+      case "mobile-app": return <MobileAppSimulator />;
+      default:           return <Overview user={user} stats={stats} />;
     }
   }
 
@@ -2130,6 +2367,7 @@ function Dashboard({ user, onLogout }) {
           <div className="sidebar-logo">E</div>
           <span>Ethio<b>Prep</b></span>
         </div>
+        <ThemeToggleSwitch theme={theme} onToggle={onToggleTheme} compact />
         <div className="user-avatar" title={user.displayName}>{user.displayName[0].toUpperCase()}</div>
       </header>
       <div className={`drawer-backdrop ${navOpen ? "open" : ""}`} onClick={() => setNavOpen(false)} aria-hidden="true" />
@@ -2166,6 +2404,7 @@ function Dashboard({ user, onLogout }) {
         </nav>
 
         <div className="sidebar-footer">
+          <ThemeToggleSwitch theme={theme} onToggle={onToggleTheme} />
           <div className="user-card">
             <div className="user-avatar">{user.displayName[0].toUpperCase()}</div>
             <div className="user-info">
@@ -2189,7 +2428,33 @@ function Dashboard({ user, onLogout }) {
    APP ROOT
    ════════════════════════════════════════════════════════════════ */
 
+const THEME_STORAGE_KEY = "ethioprep_theme";
+
 function App() {
+  const [theme, setTheme] = useState(() => {
+    try {
+      const saved = localStorage.getItem(THEME_STORAGE_KEY);
+      if (saved === "light" || saved === "dark") return saved;
+    } catch {
+      // ignore storage errors
+    }
+    return "dark";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.style.colorScheme = theme;
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // ignore storage errors
+    }
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => (prev === "dark" ? "light" : "dark"));
+  }, []);
+
   const [user, setUser] = useState(() => {
     try {
       const u = JSON.parse(localStorage.getItem("ethioprep_user") || "null");
@@ -2205,11 +2470,28 @@ function App() {
     }
   });
 
-  if (!user || user.role === "student") {
-    return <Auth onLogin={setUser} />;
+  const [showMobileSim, setShowMobileSim] = useState(true);
+
+  if (showMobileSim) {
+    return (
+      <div className="app-shell" style={{ display: "block", padding: 24, maxWidth: 1280, margin: "0 auto" }}>
+        <MobileAppSimulator onBackToPortal={() => setShowMobileSim(false)} />
+      </div>
+    );
   }
 
-  return <Dashboard user={user} onLogout={() => setUser(null)} />;
+  if (!user || user.role === "student") {
+    return (
+      <Auth
+        onLogin={setUser}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onOpenMobileSimulator={() => setShowMobileSim(true)}
+      />
+    );
+  }
+
+  return <Dashboard user={user} onLogout={() => setUser(null)} theme={theme} onToggleTheme={toggleTheme} />;
 }
 
 createRoot(document.getElementById("root")).render(<App />);

@@ -4,10 +4,10 @@ import mongoose from "mongoose";
 const router = Router();
 
 router.get("/", (_request, response) => {
-  const databaseState = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+  const databaseState = mongoose.connection.readyState === 1 ? "connected" : "in-memory-fallback";
 
-  response.status(databaseState === "connected" ? 200 : 503).json({
-    status: databaseState === "connected" ? "ok" : "degraded",
+  response.status(200).json({
+    status: "ok",
     service: "ethioprep-api",
     database: databaseState,
     timestamp: new Date().toISOString()

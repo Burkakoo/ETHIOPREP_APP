@@ -46,16 +46,26 @@ export function errorHandler(error, request, response, next) {
   const statusCode = error.statusCode || 500;
   const isOperational = error.isOperational || false;
 
-  // Log error for debugging
-  logger.error("Error occurred", {
-    message: error.message,
-    statusCode,
-    stack: error.stack,
-    path: request.path,
-    method: request.method,
-    userId: request.user?._id,
-    isOperational
-  });
+  // Log server/non-operational errors as error, and operational 4xx responses as warn
+  if (statusCode >= 500 || !isOperational) {
+    logger.error("Error occurred", {
+      message: error.message,
+      statusCode,
+      stack: error.stack,
+      path: request.path,
+      method: request.method,
+      userId: request.user?._id,
+      isOperational
+    });
+  } else {
+    logger.warn(error.message, {
+      statusCode,
+      path: request.path,
+      method: request.method,
+      userId: request.user?._id,
+      isOperational
+    });
+  }
 
   // Send appropriate error response
   const errorResponse = {

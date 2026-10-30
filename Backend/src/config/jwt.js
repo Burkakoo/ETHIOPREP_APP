@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import { env } from "./env.js";
 
@@ -10,7 +11,11 @@ export function signAccessToken(payload) {
 }
 
 export function signRefreshToken(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
+  return jwt.sign(
+    { ...payload, jti: crypto.randomUUID() },
+    JWT_SECRET,
+    { expiresIn: REFRESH_TOKEN_EXPIRY }
+  );
 }
 
 export function signToken(payload) {

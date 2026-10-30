@@ -448,15 +448,14 @@ export const refreshTokenHandler = asyncHandler(async (request, response) => {
     throw new ValidationError("Refresh token is required.");
   }
 
-  const decoded = verifyToken(token);
-  const refreshTokenDoc = await RefreshToken.findOne({
-    token,
-    userId: decoded.userId,
-    revoked: false,
-    expiresAt: { $gt: new Date() }
-  });
+  let decoded;
+  try {
+    decoded = verifyToken(token);
+  } catch {
+    throw new AuthenticationError("Invalid or expired refresh token.");
+  }
 
-  if (!refreshTokenDoc) {
+  if (!decoded || !decoded.userId) {
     throw new AuthenticationError("Invalid or expired refresh token.");
   }
 
@@ -466,22 +465,55 @@ export const refreshTokenHandler = asyncHandler(async (request, response) => {
     throw new AuthenticationError("Invalid or inactive user.");
   }
 
+  const existingTokenDoc = await RefreshToken.findOne({
+    token,
+    userId: decoded.userId
+  });
+
+  if (existingTokenDoc && existingTokenDoc.revoked) {
+    const revokedAgeMs = existingTokenDoc.revokedAt
+      ? Date.now() - new Date(existingTokenDoc.revokedAt).getTime()
+      : Infinity;
+
+    // Grace window for concurrent refresh requests using the same token within 60s
+    if (existingTokenDoc.replacedByToken && revokedAgeMs < 60 * 1000) {
+      const graceAccessToken = signToken({ userId: user._id, role: user.role });
+      return response.json({
+        accessToken: graceAccessToken,
+        refreshToken: existingTokenDoc.replacedByToken
+      });
+    }
+
+    throw new AuthenticationError("Invalid or expired refresh token.");
+  }
+
+  if (existingTokenDoc && existingTokenDoc.expiresAt <= new Date()) {
+    throw new AuthenticationError("Invalid or expired refresh token.");
+  }
+
   const newAccessToken = signToken({ userId: user._id, role: user.role });
   const newRefreshToken = signRefreshToken({ userId: user._id });
 
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  refreshTokenDoc.revoked = true;
-  refreshTokenDoc.revokedAt = new Date();
-  refreshTokenDoc.replacedByToken = newRefreshToken;
-  await refreshTokenDoc.save();
+  if (existingTokenDoc) {
+    existingTokenDoc.revoked = true;
+    existingTokenDoc.revokedAt = new Date();
+    existingTokenDoc.replacedByToken = newRefreshToken;
+    await existingTokenDoc.save();
+  }
 
-  await RefreshToken.create({
-    userId: user._id,
-    token: newRefreshToken,
-    expiresAt,
-    deviceId: request.headers["user-agent"]
-  });
+  await RefreshToken.findOneAndUpdate(
+    { token: newRefreshToken },
+    {
+      userId: user._id,
+      token: newRefreshToken,
+      expiresAt,
+      revoked: false,
+      deviceId: request.headers["user-agent"]
+    },
+    { upsert: true, new: true }
+  );
 
   return response.json({
     accessToken: newAccessToken,

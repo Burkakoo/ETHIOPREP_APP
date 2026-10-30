@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Button } from "../components/Button.js";
 import { Card } from "../components/Card.js";
 import { Icon } from "../components/Icon.js";
@@ -11,28 +11,65 @@ function getYear(exam) {
   return (exam.title || "").match(/\b(?:19|20)\d{2}\b/)?.[0] || "Practice";
 }
 
+function formatShortGrade(gradeLevel) {
+  if (!gradeLevel) return "";
+  const match = String(gradeLevel).match(/grade-(\d+)/i);
+  return match ? `G${match[1]}` : String(gradeLevel).toUpperCase();
+}
+
 function getExamChapters(exam) {
+  if (Array.isArray(exam?.chapterBreakdown) && exam.chapterBreakdown.length > 0) {
+    return exam.chapterBreakdown.map((ch) => ({
+      id: String(ch.chapterId || Math.random()),
+      title: ch.title || "Curriculum Unit",
+      order: ch.order ?? 999,
+      gradeLevel: ch.gradeLevel || "",
+      questionCount: ch.questionCount ?? null
+    }));
+  }
   if (!Array.isArray(exam?.chapterIds)) return [];
   return exam.chapterIds.map((ch) => {
     if (typeof ch === "object" && ch !== null) {
       return {
         id: String(ch._id || ch.id || Math.random()),
         title: ch.title || "Curriculum Unit",
-        order: ch.order ?? 999
+        order: ch.order ?? 999,
+        gradeLevel: ch.gradeLevel || "",
+        questionCount: null
       };
     }
-    return { id: String(ch), title: "Curriculum Unit", order: 999 };
+    return { id: String(ch), title: "Curriculum Unit", order: 999, gradeLevel: "", questionCount: null };
   });
+}
+
+function getExamTitleBase(exam) {
+  const raw = String(exam.title || "").trim();
+  const cleaned = raw
+    .replace(/\s*\(\d{4}\s*E\.?C\.?\)/i, "")
+    .replace(/\s*(?:ESSLCE|EUEE)?\s*\d{4}\s*(?:E\.?C\.?)?/i, "")
+    .trim();
+  return cleaned || exam.subjectId?.name || raw || "Entrance Exam";
 }
 
 export function ExamsScreen({ exams = [], onStartExam, loadingExamId, user }) {
   const userStream = user?.stream || "natural";
   const isNatural = userStream === "natural";
 
-  // Display mode: "year" | "chapter" | "all"
+  // Display mode: "year" | "title" | "all"
   const [viewMode, setViewMode] = useState("year");
   const [selectedYear, setSelectedYear] = useState("all");
-  const [selectedChapterId, setSelectedChapterId] = useState("all");
+  const [selectedTitleFilter, setSelectedTitleFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [collapsedYears, setCollapsedYears] = useState({});
+  const [favoriteExams, setFavoriteExams] = useState({});
+
+  function toggleYearCollapse(yr) {
+    setCollapsedYears((prev) => ({ ...prev, [yr]: !prev[yr] }));
+  }
+
+  function toggleFavoriteExam(id) {
+    setFavoriteExams((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
 
   const streamFilteredExams = useMemo(() => {
     return exams.filter((exam) => {
@@ -67,10 +104,62 @@ export function ExamsScreen({ exams = [], onStartExam, loadingExamId, user }) {
     });
   }, [exams, isNatural]);
 
-  // Group by Year
-  const yearGroups = useMemo(() => {
+  // Real-time search filter by Exam Title
+  const searchFilteredExams = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return streamFilteredExams;
+    return streamFilteredExams.filter((exam) => {
+      const fullTitle = String(exam.title || "").toLowerCase();
+      const baseTitle = getExamTitleBase(exam).toLowerCase();
+      const subjectName = String(exam.subjectId?.name || "").toLowerCase();
+      const examYear = String(getYear(exam)).toLowerCase();
+      return (
+        fullTitle.includes(q) ||
+        baseTitle.includes(q) ||
+        subjectName.includes(q) ||
+        examYear.includes(q)
+      );
+    });
+  }, [streamFilteredExams, searchQuery]);
+
+  // Group by Exam Title
+  const titleGroups = useMemo(() => {
+    const map = {};
+    searchFilteredExams.forEach((exam) => {
+      const baseTitle = getExamTitleBase(exam);
+      if (!map[baseTitle]) map[baseTitle] = [];
+      map[baseTitle].push(exam);
+    });
+
+    const sortedTitles = Object.keys(map).sort((a, b) => a.localeCompare(b));
+    return sortedTitles.map((title) => ({
+      title,
+      exams: map[title].slice().sort((a, b) => {
+        const ya = Number(getYear(a)) || 0;
+        const yb = Number(getYear(b)) || 0;
+        return yb - ya;
+      })
+    }));
+  }, [searchFilteredExams]);
+
+  const allExamTitles = useMemo(() => {
     const map = {};
     streamFilteredExams.forEach((exam) => {
+      const baseTitle = getExamTitleBase(exam);
+      map[baseTitle] = true;
+    });
+    return Object.keys(map).sort((a, b) => a.localeCompare(b));
+  }, [streamFilteredExams]);
+
+  const filteredExams = useMemo(() => {
+    if (selectedTitleFilter === "all") return searchFilteredExams;
+    return searchFilteredExams.filter((ex) => getExamTitleBase(ex) === selectedTitleFilter);
+  }, [searchFilteredExams, selectedTitleFilter]);
+
+  // Group by Year (with exams inside each year sorted alphabetically by Exam Title)
+  const yearGroups = useMemo(() => {
+    const map = {};
+    filteredExams.forEach((exam) => {
       const y = getYear(exam);
       if (!map[y]) map[y] = [];
       map[y].push(exam);
@@ -84,54 +173,17 @@ export function ExamsScreen({ exams = [], onStartExam, loadingExamId, user }) {
 
     return sortedYears.map((year) => ({
       year,
-      exams: map[year]
+      exams: map[year].slice().sort((a, b) => String(a.title || "").localeCompare(String(b.title || "")))
     }));
-  }, [streamFilteredExams]);
+  }, [filteredExams]);
 
   const allYears = useMemo(() => {
     return yearGroups.map((g) => g.year);
   }, [yearGroups]);
 
-  // Group by Chapter
-  const chapterGroups = useMemo(() => {
-    const map = {};
-    const unassignedExams = [];
-
-    streamFilteredExams.forEach((exam) => {
-      const chapters = getExamChapters(exam);
-      if (chapters.length === 0) {
-        unassignedExams.push(exam);
-      } else {
-        chapters.forEach((ch) => {
-          const key = ch.id;
-          if (!map[key]) {
-            map[key] = {
-              id: ch.id,
-              title: ch.title,
-              order: ch.order,
-              subjectName: exam.subjectId?.name || "Subject",
-              exams: []
-            };
-          }
-          if (!map[key].exams.some((e) => e._id === exam._id)) {
-            map[key].exams.push(exam);
-          }
-        });
-      }
-    });
-
-    const sortedChapters = Object.values(map).sort((a, b) => a.order - b.order);
-
-    return {
-      chapters: sortedChapters,
-      unassignedExams
-    };
-  }, [streamFilteredExams]);
-
   function renderExamCard(item, showYearBadge = false) {
     const isPremium = item.accessLevel === "premium";
     const year = getYear(item);
-    const chapters = getExamChapters(item);
 
     return (
       <Card key={item._id} style={styles.examCard}>
@@ -161,7 +213,7 @@ export function ExamsScreen({ exams = [], onStartExam, loadingExamId, user }) {
 
             {showYearBadge && (
               <View style={styles.yearBadge}>
-                <Text style={styles.yearBadgeText}>{year}</Text>
+                <Text style={styles.yearBadgeText}>{year} E.C.</Text>
               </View>
             )}
           </View>
@@ -176,49 +228,6 @@ export function ExamsScreen({ exams = [], onStartExam, loadingExamId, user }) {
             {item.description}
           </Text>
         ) : null}
-
-        {/* Chapter pill indicator if exam has chapters */}
-        {chapters.length > 0 && (
-          <View style={styles.chapterTagRow}>
-            <Icon color={COLORS.primaryDark} name="layers-outline" size={13} />
-            <Text numberOfLines={1} style={styles.chapterTagText}>
-              {chapters.length} {chapters.length === 1 ? "Chapter" : "Chapters"} covered:{" "}
-              {chapters.map((c) => c.title.split(":")[0]).join(", ")}
-            </Text>
-          </View>
-        )}
-
-        {/* Practise individual chapters in this exam */}
-        {Array.isArray(item.chapterBreakdown) && item.chapterBreakdown.length > 0 && (
-          <View style={styles.cardChaptersContainer}>
-            <Text style={styles.cardChaptersTitle}>
-              Practise One Chapter in {year} at Once:
-            </Text>
-            <ScrollView
-              contentContainerStyle={styles.cardChaptersScroll}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-            >
-              {item.chapterBreakdown.map((ch) => {
-                const isChLoading = loadingExamId === `${item._id}_${ch.chapterId}`;
-                return (
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    disabled={isChLoading}
-                    key={ch.chapterId}
-                    onPress={() => onStartExam(item, { chapterId: ch.chapterId })}
-                    style={styles.cardChapterBtn}
-                  >
-                    <Icon color={COLORS.primaryDark} name="play" size={11} />
-                    <Text numberOfLines={1} style={styles.cardChapterBtnText}>
-                      {ch.title.split(":")[0]} ({ch.questionCount} Qs)
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
 
         <View style={styles.metaRow}>
           <Text style={styles.metaText}>
@@ -235,7 +244,7 @@ export function ExamsScreen({ exams = [], onStartExam, loadingExamId, user }) {
           style={styles.startBtn}
           variant={isPremium ? "secondary" : "primary"}
         >
-          Practise Full {year} Exam ({item.questionIds?.length || 0} Qs)
+          Practise Full {year} E.C. Exam ({item.questionIds?.length || 0} Qs)
         </Button>
       </Card>
     );
@@ -249,10 +258,45 @@ export function ExamsScreen({ exams = [], onStartExam, loadingExamId, user }) {
         {isNatural ? "Natural Science Exams" : "Social Science Exams"}
       </Text>
       <Text style={styles.subHeader}>
-        Timed simulations based on Ethiopian EUEE blueprints for {isNatural ? "Natural" : "Social"} Science.
+        Past papers, Entrances and Models organized by year and exam title.
       </Text>
 
-      {/* Buttons used to display exam by Year and Chapters */}
+      {/* Real-Time Search Bar by Exam Title */}
+      <View style={styles.searchContainer}>
+        <Icon color={COLORS.textMuted} name="search-outline" size={18} />
+        <TextInput
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+          onChangeText={(text) => setSearchQuery(text)}
+          placeholder="Search exams by title (e.g., Biology 2017, Regional Model)..."
+          placeholderTextColor={COLORS.textMuted}
+          style={styles.searchInput}
+          value={searchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity
+            accessibilityLabel="Clear search"
+            onPress={() => setSearchQuery("")}
+            style={styles.clearSearchBtn}
+          >
+            <Icon color={COLORS.textMuted} name="close-circle" size={18} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {searchQuery.trim().length > 0 && (
+        <View style={styles.searchStatusRow}>
+          <Text style={styles.searchStatusText}>
+            Showing {filteredExams.length} {filteredExams.length === 1 ? "exam" : "exams"} matching "{searchQuery.trim()}"
+          </Text>
+          <TouchableOpacity onPress={() => setSearchQuery("")}>
+            <Text style={styles.resetSearchLink}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Mode Toggle: By Year | By Exam Title | All Exams */}
       <View style={styles.toggleRow}>
         <TouchableOpacity
           activeOpacity={0.8}
@@ -273,18 +317,18 @@ export function ExamsScreen({ exams = [], onStartExam, loadingExamId, user }) {
 
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => setViewMode("chapter")}
-          style={[styles.toggleBtn, viewMode === "chapter" && styles.toggleBtnActive]}
+          onPress={() => setViewMode("title")}
+          style={[styles.toggleBtn, viewMode === "title" && styles.toggleBtnActive]}
         >
           <Icon
-            color={viewMode === "chapter" ? COLORS.onPrimary : COLORS.primary}
-            name="layers-outline"
+            color={viewMode === "title" ? COLORS.onPrimary : COLORS.primary}
+            name="document-text-outline"
             size={16}
           />
           <Text
-            style={[styles.toggleBtnText, viewMode === "chapter" && styles.toggleBtnTextActive]}
+            style={[styles.toggleBtnText, viewMode === "title" && styles.toggleBtnTextActive]}
           >
-            By Chapters
+            By Exam Title
           </Text>
         </TouchableOpacity>
 
@@ -306,12 +350,56 @@ export function ExamsScreen({ exams = [], onStartExam, loadingExamId, user }) {
         </TouchableOpacity>
       </View>
 
+      {/* Exam Title Filter Chips */}
+      {allExamTitles.length > 1 && (
+        <ScrollView
+          contentContainerStyle={styles.filterScroll}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+        >
+          <TouchableOpacity
+            onPress={() => setSelectedTitleFilter("all")}
+            style={[
+              styles.filterChip,
+              selectedTitleFilter === "all" && styles.filterChipActive
+            ]}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                selectedTitleFilter === "all" && styles.filterChipTextActive
+              ]}
+            >
+              All Exam Titles ({searchFilteredExams.length})
+            </Text>
+          </TouchableOpacity>
+          {allExamTitles.map((examTitle) => {
+            const isActive = selectedTitleFilter === examTitle;
+            return (
+              <TouchableOpacity
+                key={examTitle}
+                onPress={() => setSelectedTitleFilter(examTitle)}
+                style={[styles.filterChip, isActive && styles.filterChipActive]}
+              >
+                <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                  {examTitle}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
+
       {/* Empty State */}
-      {streamFilteredExams.length === 0 ? (
+      {filteredExams.length === 0 ? (
         <EmptyState
           icon="document-text-outline"
-          message="No published exams currently available for your stream."
-          title="No exams yet"
+          message={
+            searchQuery.trim()
+              ? `No exams matched "${searchQuery.trim()}". Try searching for another exam title or year.`
+              : "No published exams currently available for your selection."
+          }
+          title="No exams found"
         />
       ) : (
         <>
@@ -338,7 +426,7 @@ export function ExamsScreen({ exams = [], onStartExam, loadingExamId, user }) {
                         selectedYear === "all" && styles.filterChipTextActive
                       ]}
                     >
-                      All Years ({streamFilteredExams.length})
+                      All Years ({filteredExams.length})
                     </Text>
                   </TouchableOpacity>
 
@@ -357,7 +445,7 @@ export function ExamsScreen({ exams = [], onStartExam, loadingExamId, user }) {
                             isActive && styles.filterChipTextActive
                           ]}
                         >
-                          {yr} ({count})
+                          {yr} E.C. ({count})
                         </Text>
                       </TouchableOpacity>
                     );
@@ -365,138 +453,151 @@ export function ExamsScreen({ exams = [], onStartExam, loadingExamId, user }) {
                 </ScrollView>
               )}
 
-              {/* Year Groups */}
+              {/* Collapsible Year Groups matching Screenshot */}
               {yearGroups
                 .filter((g) => selectedYear === "all" || g.year === selectedYear)
-                .map((group) => (
-                  <View key={group.year} style={styles.sectionBlock}>
-                    <View style={styles.sectionTitleRow}>
-                      <View style={styles.sectionTitleLeft}>
-                        <Icon color={COLORS.primary} name="calendar-outline" size={17} />
-                        <Text style={styles.sectionHeading}>
+                .map((group) => {
+                  const isCollapsed = Boolean(collapsedYears[group.year]);
+                  return (
+                    <View
+                      key={group.year}
+                      style={{
+                        backgroundColor: "#FFFFFF",
+                        borderRadius: 18,
+                        padding: 14,
+                        marginBottom: 14,
+                        borderWidth: 1,
+                        borderColor: "#F1F5F9",
+                        ...SHADOW.sm
+                      }}
+                    >
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => toggleYearCollapse(group.year)}
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: isCollapsed ? 0 : 12
+                        }}
+                      >
+                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A" }}>
                           {group.year === "Practice"
                             ? "General Practice Exams"
-                            : `${group.year} National Entrance Exams`}
+                            : `${group.year} E.C. Exams`}
                         </Text>
-                      </View>
-                      <View style={styles.countBadge}>
-                        <Text style={styles.countBadgeText}>{group.exams.length}</Text>
-                      </View>
-                    </View>
+                        <Icon
+                          color="#2563EB"
+                          name={isCollapsed ? "chevron-down" : "chevron-up"}
+                          size={18}
+                        />
+                      </TouchableOpacity>
 
-                    {group.exams.map((item) => renderExamCard(item, false))}
-                  </View>
-                ))}
+                      {!isCollapsed &&
+                        group.exams.map((item) => {
+                          const isFav = Boolean(favoriteExams[item._id]);
+                          const dur = item.durationMinutes || 180;
+                          const qCount = item.questionIds?.length || item.totalQuestions || 60;
+                          const isModel =
+                            String(item.title || "").toLowerCase().includes("model") ||
+                            String(group.year) === "2018";
+                          const typeLabel = isModel ? "Regional Model Exam" : "Entrance Exam (ESSLCE)";
+                          return (
+                            <TouchableOpacity
+                              key={item._id}
+                              activeOpacity={0.85}
+                              onPress={() => onStartExam(item)}
+                              style={{
+                                backgroundColor: "#F8FAFC",
+                                borderRadius: 14,
+                                paddingVertical: 11,
+                                paddingHorizontal: 12,
+                                marginBottom: 8,
+                                flexDirection: "row",
+                                alignItems: "center"
+                              }}
+                            >
+                              <View
+                                style={{
+                                  width: 42,
+                                  height: 42,
+                                  borderRadius: 21,
+                                  backgroundColor: "#EFF6FF",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  marginRight: 12
+                                }}
+                              >
+                                <Icon color="#2563EB" name="help-circle" size={22} />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 14, fontWeight: "800", color: "#0F172A" }}>
+                                  {item.title}
+                                </Text>
+                                <Text style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
+                                  {dur} Mins • {qCount} Qs • {typeLabel}
+                                </Text>
+                              </View>
+                              <TouchableOpacity
+                                onPress={() => toggleFavoriteExam(item._id)}
+                                style={{ padding: 6 }}
+                              >
+                                <Icon
+                                  color={isFav ? "#EF4444" : "#94A3B8"}
+                                  name={isFav ? "heart" : "heart-outline"}
+                                  size={19}
+                                />
+                              </TouchableOpacity>
+                            </TouchableOpacity>
+                          );
+                        })}
+                    </View>
+                  );
+                })}
             </View>
           )}
 
-          {/* ───────────────── BY CHAPTER MODE ───────────────── */}
-          {viewMode === "chapter" && (
+          {/* ───────────────── BY EXAM TITLE MODE ───────────────── */}
+          {viewMode === "title" && (
             <View>
               <Text style={styles.modeNoticeText}>
-                Exams categorized by subject curriculum chapters and units.
+                Exams organized by Exam Title and sorted by Year (2018–2013 E.C.).
               </Text>
 
-              {/* Chapters List */}
-              {chapterGroups.chapters.length === 0 ? (
-                <Card style={styles.infoCard}>
-                  <Icon color={COLORS.primary} name="information-circle-outline" size={24} />
-                  <Text style={styles.infoCardTitle}>Curriculum Units</Text>
-                  <Text style={styles.infoCardSub}>
-                    Exams currently available cover comprehensive subject papers. Explore them below or under "By Year".
-                  </Text>
-                </Card>
-              ) : (
-                chapterGroups.chapters.map((ch) => (
-                  <View key={ch.id} style={styles.sectionBlock}>
+              {titleGroups
+                .filter((g) => selectedTitleFilter === "all" || g.title === selectedTitleFilter)
+                .map((group) => (
+                  <View key={group.title} style={styles.sectionBlock}>
                     <View style={styles.sectionTitleRow}>
                       <View style={styles.sectionTitleLeft}>
-                        <Icon color={COLORS.primary} name="book-outline" size={16} />
+                        <Icon color={COLORS.primary} name="document-text-outline" size={16} />
                         <Text numberOfLines={1} style={styles.sectionHeading}>
-                          {ch.title}
+                          {group.title}
                         </Text>
                       </View>
-                      <View style={styles.chapterSubjectPill}>
-                        <Text style={styles.chapterSubjectPillText}>{ch.subjectName}</Text>
+                      <View style={styles.countBadge}>
+                        <Text style={styles.countBadgeText}>{group.exams.length} yrs</Text>
                       </View>
                     </View>
 
-                    {ch.exams.map((item) => {
-                      const yr = getYear(item);
-                      const bItem = Array.isArray(item.chapterBreakdown)
-                        ? item.chapterBreakdown.find((b) => String(b.chapterId) === String(ch.id))
-                        : null;
-                      const qCount = bItem?.questionCount;
-                      const isChLoading = loadingExamId === `${item._id}_${ch.id}`;
-
-                      return (
-                        <Card key={`${item._id}_${ch.id}`} style={styles.examCard}>
-                          <View style={styles.badgeRow}>
-                            <View style={styles.badgeLeft}>
-                              <View style={styles.yearBadge}>
-                                <Text style={styles.yearBadgeText}>{yr} Exam Booklet</Text>
-                              </View>
-                              <View style={styles.subjectBadge}>
-                                <Text style={styles.subjectBadgeText}>{item.subjectId?.name || "Subject"}</Text>
-                              </View>
-                            </View>
-                            <Text style={styles.durationText}>{item.durationMinutes} min</Text>
-                          </View>
-
-                          <Text style={styles.title}>{item.title}</Text>
-
-                          <View style={styles.chapterDirectActionRow}>
-                            <View style={styles.chapterDirectInfo}>
-                              <Text style={styles.chapterDirectCountText}>
-                                {qCount !== undefined && qCount !== null
-                                  ? `${qCount} questions from this unit in ${yr}`
-                                  : "Chapter practice questions"}
-                              </Text>
-                            </View>
-                            <TouchableOpacity
-                              activeOpacity={0.8}
-                              disabled={isChLoading}
-                              onPress={() => onStartExam(item, { chapterId: ch.id })}
-                              style={styles.chapterDirectBtn}
-                            >
-                              <Icon color={COLORS.onPrimary} name="play" size={13} />
-                              <Text style={styles.chapterDirectBtnText}>
-                                {isChLoading ? "Opening..." : `Practise ${yr} Unit (${qCount || ""} Qs)`}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        </Card>
-                      );
-                    })}
+                    {group.exams.map((item) => renderExamCard(item, true))}
                   </View>
-                ))
-              )}
-
-              {/* Unassigned / Comprehensive Papers */}
-              {chapterGroups.unassignedExams.length > 0 && (
-                <View style={styles.sectionBlock}>
-                  <View style={styles.sectionTitleRow}>
-                    <View style={styles.sectionTitleLeft}>
-                      <Icon color={COLORS.primary} name="documents-outline" size={16} />
-                      <Text style={styles.sectionHeading}>Full Subject Blueprint Exams</Text>
-                    </View>
-                    <View style={styles.countBadge}>
-                      <Text style={styles.countBadgeText}>
-                        {chapterGroups.unassignedExams.length}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {chapterGroups.unassignedExams.map((item) => renderExamCard(item, true))}
-                </View>
-              )}
+                ))}
             </View>
           )}
 
           {/* ───────────────── ALL EXAMS MODE ───────────────── */}
           {viewMode === "all" && (
             <View>
-              {streamFilteredExams.map((item) => renderExamCard(item, true))}
+              {filteredExams
+                .slice()
+                .sort((a, b) => {
+                  const ya = Number(getYear(a)) || 0;
+                  const yb = Number(getYear(b)) || 0;
+                  if (yb !== ya) return yb - ya;
+                  return String(a.title || "").localeCompare(String(b.title || ""));
+                })
+                .map((item) => renderExamCard(item, true))}
             </View>
           )}
         </>
@@ -519,6 +620,45 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textMuted,
     marginBottom: SPACING.md
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 10,
+    marginBottom: SPACING.sm,
+    gap: 8,
+    ...SHADOW.sm
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.text,
+    paddingVertical: 0
+  },
+  clearSearchBtn: {
+    padding: 2
+  },
+  searchStatusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: SPACING.sm,
+    paddingHorizontal: 2
+  },
+  searchStatusText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.textMuted
+  },
+  resetSearchLink: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: COLORS.primary
   },
   toggleRow: {
     flexDirection: "row",

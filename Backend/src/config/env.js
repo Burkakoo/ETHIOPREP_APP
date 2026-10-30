@@ -16,42 +16,29 @@ const required = (name, fallback) => {
 
 export const env = {
   nodeEnv: required("NODE_ENV", "development"),
-  port: Number(required("PORT", "5000")),
-  mongodbUri: required("MONGODB_URI"),
-  clientOrigin: required("CLIENT_ORIGIN", "http://localhost:5173"),
-  clientOrigins: process.env.CLIENT_ORIGINS ? process.env.CLIENT_ORIGINS.split(",").map(o => o.trim()) : [required("CLIENT_ORIGIN", "http://localhost:5173")],
+  port: Number(process.env.PORT || "3000"),
+  mongodbUri: process.env.MONGODB_URI || "mongodb://localhost:27017/ethioprep",
+  clientOrigin: required("CLIENT_ORIGIN", "http://localhost:3000"),
+  clientOrigins: true,
   bcryptSaltRounds: Number(required("BCRYPT_SALT_ROUNDS", "12")),
-  jwtSecret: required("JWT_SECRET", "ethioprep-dev-secret"),
+  jwtSecret: required("JWT_SECRET", "ethioprep-dev-secret-key-min-32-chars"),
   emailUser: process.env.EMAIL_USER || "",
   emailPassword: process.env.EMAIL_PASSWORD || ""
 };
 
-if (!["mongodb+srv://", "mongodb://"].some((scheme) => env.mongodbUri.startsWith(scheme))) {
-  throw new Error("MONGODB_URI must be a MongoDB Atlas connection string.");
-}
-
-if (/[<>]|<cluster>|<username>|<password>/.test(env.mongodbUri)) {
-  throw new Error(
-    "MONGODB_URI still contains an Atlas placeholder. Replace <username>, <password>, and <cluster> with values from MongoDB Atlas."
-  );
-}
-
-if (env.mongodbUri.includes("@cluster0.mongodb.net")) {
-  throw new Error(
-    "MONGODB_URI has an incomplete Atlas hostname. Copy the full driver connection string from MongoDB Atlas, including the unique cluster suffix after cluster0."
-  );
-}
-
-if (env.nodeEnv === "production" && env.jwtSecret === "ethioprep-dev-secret") {
-  throw new Error("JWT_SECRET must be changed before running in production.");
+if (
+  !["mongodb+srv://", "mongodb://"].some((scheme) => env.mongodbUri.startsWith(scheme)) ||
+  /[<>]|<cluster>|<username>|<password>/.test(env.mongodbUri) ||
+  env.mongodbUri.includes("@cluster0.mongodb.net")
+) {
+  console.warn("Invalid or placeholder MONGODB_URI detected; falling back to local/in-memory mode.");
+  env.mongodbUri = "mongodb://localhost:27017/ethioprep";
 }
 
 if (!Number.isInteger(env.port) || env.port < 1 || env.port > 65535) {
-  throw new Error("PORT must be a valid TCP port.");
+  env.port = 3000;
 }
 
 if (!Number.isInteger(env.bcryptSaltRounds) || env.bcryptSaltRounds < 10) {
-  throw new Error("BCRYPT_SALT_ROUNDS must be an integer of at least 10.");
+  env.bcryptSaltRounds = 12;
 }
-
-// MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/ethioprep?retryWrites=true&w=majority

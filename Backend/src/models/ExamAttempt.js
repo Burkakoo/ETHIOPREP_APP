@@ -1,4 +1,4 @@
-﻿import mongoose from "mongoose";
+import mongoose from "mongoose";
 
 const examAttemptSchema = new mongoose.Schema(
   {
@@ -12,6 +12,11 @@ const examAttemptSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Exam",
       required: true,
+      index: true
+    },
+    chapterId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Chapter",
       index: true
     },
     status: {

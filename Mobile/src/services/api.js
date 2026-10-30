@@ -2,12 +2,64 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api";
 
-export async function request(path, options = {}) {
+let refreshPromise = null;
+
+async function tryRefreshAccessToken() {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = await AsyncStorage.getItem("ethioprep_refresh_token");
+      if (!refreshToken) return null;
+
+      const response = await fetch(`${API_URL}/auth/refresh-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken })
+      });
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 400) {
+          await AsyncStorage.multiRemove(["ethioprep_token", "ethioprep_refresh_token"]);
+        }
+        return null;
+      }
+
+      const data = await response.json().catch(() => ({}));
+      if (data.accessToken) {
+        await AsyncStorage.setItem("ethioprep_token", data.accessToken);
+        if (data.refreshToken) {
+          await AsyncStorage.setItem("ethioprep_refresh_token", data.refreshToken);
+        }
+        return data.accessToken;
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+export async function request(path, options = {}, isRetry = false) {
   const token = await AsyncStorage.getItem("ethioprep_token");
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const response = await fetch(`${API_URL}${path}`, { ...options, headers });
+
+  if (response.status === 401 && !isRetry && !path.startsWith("/auth/login") && !path.startsWith("/auth/refresh-token")) {
+    const newAccessToken = await tryRefreshAccessToken();
+    if (newAccessToken) {
+      return request(path, options, true);
+    }
+  }
+
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || "Request failed.");
   return body;
@@ -20,6 +72,9 @@ export async function login(email, password) {
   });
   if (result.accessToken) {
     await AsyncStorage.setItem("ethioprep_token", result.accessToken);
+  }
+  if (result.refreshToken) {
+    await AsyncStorage.setItem("ethioprep_refresh_token", result.refreshToken);
   }
   if (result.user) {
     await AsyncStorage.setItem("ethioprep_user", JSON.stringify(result.user));
@@ -43,6 +98,9 @@ export async function verifyEmail(email, otp) {
   });
   if (result.accessToken) {
     await AsyncStorage.setItem("ethioprep_token", result.accessToken);
+  }
+  if (result.refreshToken) {
+    await AsyncStorage.setItem("ethioprep_refresh_token", result.refreshToken);
   }
   if (result.user) {
     await AsyncStorage.setItem("ethioprep_user", JSON.stringify(result.user));
@@ -111,7 +169,6 @@ export async function updatePassword(currentPassword, newPassword) {
   });
 }
 
-
 export async function requestWithOfflineQueue(path, options, change) {
   try {
     return { online: true, result: await request(path, options) };
@@ -125,5 +182,17 @@ export async function requestWithOfflineQueue(path, options, change) {
 }
 
 export async function logout() {
-  await AsyncStorage.multiRemove(["ethioprep_token", "ethioprep_user"]);
+  try {
+    const refreshToken = await AsyncStorage.getItem("ethioprep_refresh_token");
+    if (refreshToken) {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken })
+      });
+    }
+  } catch {
+    // ignore network errors on logout
+  }
+  await AsyncStorage.multiRemove(["ethioprep_token", "ethioprep_refresh_token", "ethioprep_user"]);
 }

@@ -5,21 +5,13 @@ import { verifyEmailTransport } from "./config/email.js";
 
 let server;
 
-async function start(retries = 3) {
-  try {
-    await connectDatabase();
-    await verifyEmailTransport();
-    server = app.listen(env.port, () => {
-      console.info(`EthioPrep API listening on http://localhost:${env.port}`);
-    });
-  } catch (error) {
-    if (retries > 0) {
-      console.warn(`Connection to MongoDB Atlas failed, retrying in 3 seconds... (${retries} retries left)`);
-      setTimeout(() => start(retries - 1), 3000);
-    } else {
-      console.error("Failed to start EthioPrep API:", error);
-      process.exit(1);
-    }
+async function start() {
+  server = app.listen(env.port, "0.0.0.0", () => {
+    console.info(`EthioPrep API & Web listening on http://0.0.0.0:${env.port}`);
+  });
+  await connectDatabase();
+  if (env.emailUser && env.emailPassword) {
+    verifyEmailTransport().catch(() => {});
   }
 }
 

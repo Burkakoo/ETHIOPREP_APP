@@ -1464,3 +1464,330 @@ tbody tr:hover { background: rgba(0, 200, 150, 0.05); }
   .toast-region { top: calc(var(--topbar-h) + 10px); right: 16px; z-index: 44; }
   .auth-panel { padding: 32px 22px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   LIGHT THEME & THEME TOGGLE SWITCH
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root[data-theme="light"] {
+  --bg:           #f4f7fb;
+  --surface:      #ffffff;
+  --surface-2:    #eef2f8;
+  --surface-3:    #e2e8f2;
+  --border:       #d8e0ed;
+  --border-light: #c3cfe2;
+
+  --green:        #00a87e;
+  --green-dim:    #008a68;
+  --green-glow:   rgba(0, 168, 126, 0.16);
+  --green-bg:     rgba(0, 168, 126, 0.10);
+
+  --blue:         #2563eb;
+  --amber:        #d97706;
+  --red:          #dc2626;
+  --purple:       #7c3aed;
+
+  --text:         #0f172a;
+  --text-2:       #475569;
+  --text-3:       #64748b;
+
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.07);
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.10);
+  --shadow-lg: 0 18px 48px rgba(15, 23, 42, 0.14);
+  --shadow-xl: 0 32px 80px rgba(15, 23, 42, 0.18);
+  --shadow-glow: 0 8px 24px rgba(0, 168, 126, 0.24);
+  --ring: 0 0 0 3px rgba(0, 168, 126, 0.22);
+
+  --glass: rgba(255, 255, 255, 0.88);
+  --glass-border: rgba(15, 23, 42, 0.08);
+  --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0));
+}
+
+:root[data-theme="light"] .auth-shell {
+  background:
+    radial-gradient(ellipse 60% 50% at 70% 20%, rgba(0, 168, 126, 0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 60% at 20% 80%, rgba(37, 99, 235, 0.08) 0%, transparent 60%),
+    linear-gradient(180deg, #f8fafd 0%, #edf2f9 100%);
+}
+
+:root[data-theme="light"] .auth-panel {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-xl);
+}
+
+:root[data-theme="light"] .notice.toast {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: var(--border);
+}
+
+:root[data-theme="light"] .notice-error,
+:root[data-theme="light"] .auth-error {
+  color: var(--red);
+}
+
+:root[data-theme="light"] .nav-item:hover {
+  background: var(--surface-2);
+}
+
+:root[data-theme="light"] .user-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+:root[data-theme="light"] tbody tr:nth-child(even) {
+  background: rgba(15, 23, 42, 0.018);
+}
+
+:root[data-theme="light"] .student-nav {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+@media (max-width: 600px) {
+  :root[data-theme="light"] .sidebar {
+    background: rgba(255, 255, 255, 0.98);
+  }
+}
+
+/* ─── Theme Toggle Switch Component ─────────────────────────────────── */
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  margin-bottom: 10px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.theme-toggle-btn:hover {
+  background: var(--surface-3);
+  border-color: var(--border-light);
+}
+
+.theme-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-2);
+}
+
+.theme-toggle-btn:hover .theme-toggle-label {
+  color: var(--text);
+}
+
+.theme-toggle-icon {
+  display: inline-grid;
+  place-items: center;
+  color: var(--green);
+}
+
+.theme-switch-track {
+  position: relative;
+  width: 38px;
+  height: 20px;
+  border-radius: 99px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-light);
+  transition: background var(--transition), border-color var(--transition);
+  flex-shrink: 0;
+}
+
+.theme-switch-track.light {
+  background: var(--green-bg);
+  border-color: var(--green);
+}
+
+.theme-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-2);
+  transition: transform var(--transition), background var(--transition);
+}
+
+.theme-switch-track.light .theme-switch-thumb {
+  transform: translateX(18px);
+  background: var(--green);
+}
+
+.theme-toggle-compact {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+  flex-shrink: 0;
+}
+
+.theme-toggle-compact:hover {
+  background: var(--surface-3);
+  color: var(--green);
+  border-color: var(--border-light);
+}
+
+@media (max-width: 900px) and (min-width: 601px) {
+  .theme-toggle-btn {
+    justify-content: center;
+    padding: 9px;
+  }
+  .theme-toggle-label span,
+  .theme-switch-track {
+    display: none;
+  }
+}
+
+/* ─── Weekly Quiz Performance Chart (Recharts) ─────────────────────── */
+.weekly-chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.weekly-chart-subtitle {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.weekly-chart-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.weekly-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.weekly-kpi-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.weekly-kpi-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.weekly-kpi-label {
+  font-size: 11.5px;
+  color: var(--text-3);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 3px;
+}
+
+.weekly-kpi-val-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.weekly-kpi-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.weekly-kpi-meta {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.weekly-chart-container {
+  width: 100%;
+  min-height: 310px;
+  padding-top: 4px;
+}
+
+.chart-tooltip {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 11px 14px;
+  box-shadow: var(--shadow-lg);
+  min-width: 195px;
+}
+
+.chart-tooltip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chart-tooltip-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.chart-tooltip-list {
+  display: grid;
+  gap: 6px;
+}
+
+.chart-tooltip-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+}
+
+.chart-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chart-tooltip-name {
+  color: var(--text-2);
+  flex: 1;
+}
+
+.chart-tooltip-value {
+  color: var(--text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+

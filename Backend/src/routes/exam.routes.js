@@ -1,11 +1,12 @@
-﻿import { Router } from "express";
-import { archiveExam, createExam, listPublishedExams, publishExam, restoreExam, startExamAttempt, submitExamAttempt, updateExam } from "../controllers/exam.controller.js";
+import { Router } from "express";
+import { archiveExam, createExam, getOfflineExamBundle, listPublishedExams, publishExam, restoreExam, startExamAttempt, submitExamAttempt, updateExam } from "../controllers/exam.controller.js";
 import { requireAuth, requireRole } from "../middleware/auth.middleware.js";
 import { validateObjectId } from "../middleware/validateObjectId.middleware.js";
 
 const router = Router();
 
 router.get("/", requireAuth, listPublishedExams);
+router.get("/offline-bundle", requireAuth, getOfflineExamBundle);
 router.post("/", requireAuth, requireRole("teacher", "content_manager", "admin"), createExam);
 router.patch("/:examId", requireAuth, validateObjectId("examId"), requireRole("teacher", "content_manager", "admin"), updateExam);
 router.patch("/:examId/publish", requireAuth, validateObjectId("examId"), requireRole("teacher", "content_manager", "admin"), publishExam);

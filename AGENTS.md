@@ -141,13 +141,54 @@ EXPO_PUBLIC_API_URL=http://localhost:5000/api
 - ✅ Credentials enabled for cookie support
 
 ### Phase 9: EUEE / ESSLCE Past Exams Seeding (2013 – 2017 E.C.) ✅
-- ✅ Total 29 exams, 2,276 questions seeded and published across 5 academic years:
+- ✅ **Grade 9–12 Exact Curriculum Mapping Applied**:
+  - All 2,824 past entrance and model exam questions across all 35 exams have been systematically mapped to their exact respective Grade (*_9, *_10, *_11, *_12) and official syllabus chapters.
+  - Eliminated single-grade dumping under Grade 12; removed 84 artificial overflow chapters.
+  - Students selecting Grades 9, 10, 11, or 12 in the mobile app and web portal now see past entrance exam practice questions aligned directly with each grade's authentic curriculum units.
+- ✅ Total 46 exams, 3,783 questions seeded and published across 6 academic years:
   - **2013 E.C. (6 exams / 475 Qs)**: Biology (100), Chemistry (80), English (120), Math (65), Physics (50), SAT (60)
   - **2014 E.C. (6 exams / 475 Qs)**: Biology (100), Chemistry (80), English (120), Math (65), Physics (50), SAT (60)
-  - **2015 E.C. (6 exams / 475 Qs)**: Biology (100), Chemistry (80), English (120), Math (65), Physics (50), SAT (60)
-  - **2016 E.C. (6 exams / 477 Qs)**: Biology (100), Chemistry (77), English (120), Math (60), Physics (60), SAT (60)
-  - **2017 E.C. (5 exams / 380 Qs)**: Biology (100), Math (60), Physics (60), SAT (60), English (100)
+  - **2015 E.C. (8 exams / 675 Qs)**: Biology (100), Chemistry (80), English (120), Geography (100), History (100), Math (65), Physics (50), SAT (60)
+  - **2016 E.C. (8 exams / 677 Qs)**: Biology (100), Chemistry (77), English (120), Geography (100), History (100), Math (60), Physics (60), SAT (60)
+  - **2017 E.C. (9 exams / 748 Qs)**: Biology (100), Chemistry (80), Economics (85), English (100), Geography (103), History (100), Math (60), Physics (60), SAT (60)
+  - **2018 E.C. (9 exams / 740 Qs)**: Biology Regional Model Exam (100), Chemistry Regional Model Exam (80), Economics Regional Model Exam (80), English Regional Model Exam (90), Geography Regional Model Exam (100), History Regional Model Exam (100), Mathematics Regional Model Exam (70), Physics Regional Model Exam (60), Scholastic Aptitude Test (SAT) Regional Model Exam (60)
 - ✅ All questions indexed with complete options, verified single-letter answers, embedded stimuli/passages, and detailed pedagogical explanations.
+
+### Phase 10: Multi-Grade Curriculum Management & Chapter Practice (Web & Mobile) ✅
+- ✅ **Backend Improvements**:
+  - `ExamAttempt.js`: Added `chapterId` reference to track chapter-level practice attempts.
+  - `exam.controller.js`:
+    - `startExamAttempt`: Accepts `chapterId` (query or body), filters exam questions to that chapter only, and marks `attempt.chapterId`.
+    - `submitExamAttempt`: When `attempt.chapterId` is set, grades and scores exclusively against questions from that chapter; calculates accurate percentage and totals for the specific unit practiced.
+    - `listPublishedExams`: Populates `gradeLevel` and `subjectCode` for each unit in `chapterBreakdown`, sorting first by Grade (Grade 9 → 12) then by Unit order.
+    - `createExam`, `updateExam`, `publishExam`: Supports multi-grade exams within a discipline (e.g. entrance exams covering Grade 9–12 subjects), validating questions against allowed discipline subjects.
+  - `questionBank.controller.js`: Added `gradeLevel` filtering on `/subjects` and `/questions`.
+- ✅ **Web Management Portal (`Web/JavaScript/src/main.jsx`)**:
+  - **Subjects & Courses Page**:
+    - Grade level filter pills: `All Grades`, `Grade 9`, `Grade 10`, `Grade 11`, `Grade 12`, `College`.
+    - Modal creates and edits courses with explicit Grade Level and Stream.
+    - Table shows Grade Level badge (`Grade 9`, etc.) and Stream badge.
+  - **Chapters Page**:
+    - Grade level filter bar dynamically filters the subject selector.
+    - Subject selector clearly indicates grade and code (`Biology (Grade 9 - BIO_9)`).
+    - Teachers and admins create/edit units directly mapped to that grade's curriculum.
+  - **Question Bank Page**:
+    - Filter bar: Grade Level pills + Grade-filtered Subject selector.
+    - Question Create / Edit Modal:
+      - Grade Level dropdown dynamically updates Subject selector.
+      - Subject selector dynamically updates Curriculum Unit selector.
+    - Table displays Grade Level, Subject, and Unit/Chapter columns with badges.
+  - **Exams Management Page**:
+    - Multi-grade entrance exams supported with year filters (2013–2017).
+    - Question selector in modal lets teachers filter questions by Grade tabs (`Grade 9`, `Grade 10`, `Grade 11`, `Grade 12`), showing count of selected questions per grade.
+- ✅ **Mobile Student Application**:
+  - `SubjectScreen.js`:
+    - Header displays Grade badge for the selected subject (e.g. `Grade 9 · Natural Science`).
+    - "By Year" tab: Multi-grade filter chips (`All Units`, `Grade 9`, `Grade 10`, `Grade 11`, `Grade 12`) when viewing entrance exams that span grades. Unit cards display Grade badge (`Grade 9 • Unit 1`).
+    - "By Chapter" tab: Displays authentic curriculum units for that grade, showing national exam years available with question counts. Tapping "Practise Unit" launches the chapter-filtered exam session.
+  - `ExamsScreen.js`:
+    - Chapter practice chips display Grade prefixes (e.g. `G9 • Unit 1 (4 Qs)`).
+  - Chapter practice attempts score accurately based on the attempted unit questions.
 
 ## Backend Architecture
 

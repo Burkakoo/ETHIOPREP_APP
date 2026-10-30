@@ -130,13 +130,17 @@ function MainDashboard({ user, onLogout }) {
   }
 
   async function handleStartExam(examItem, options = {}) {
-    const loadingKey = options?.chapterId ? `${examItem._id}_${options.chapterId}` : examItem._id;
+    const loadingKey = options?.chapterId
+      ? `${examItem._id}_${options.chapterId}${options.allYears ? "_all" : ""}`
+      : examItem._id;
     setLoadingExamId(loadingKey);
     setNotice(null);
     try {
-      const url = options?.chapterId
-        ? `/exams/${examItem._id}/start?chapterId=${options.chapterId}`
-        : `/exams/${examItem._id}/start`;
+      const params = new URLSearchParams();
+      if (options?.chapterId) params.set("chapterId", options.chapterId);
+      if (options?.allYears) params.set("allYears", "true");
+      const qs = params.toString();
+      const url = `/exams/${examItem._id}/start${qs ? `?${qs}` : ""}`;
       const examData = await request(url, { method: "POST" });
       setActiveExamSession(examData);
     } catch (error) {

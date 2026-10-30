@@ -50,20 +50,50 @@ export function SubjectScreen({
   const [selectedExamYearIndex, setSelectedExamYearIndex] = useState(0);
   const [subjectChapters, setSubjectChapters] = useState([]);
 
-  useEffect(() => {
-    if (subject?._id) {
-      request(`/question-bank/subjects/${subject._id}/chapters`)
-        .then((res) => {
-          if (res?.chapters && Array.isArray(res.chapters)) {
-            setSubjectChapters(res.chapters);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [subject?._id]);
-
   const curDiscipline = getSubjectDiscipline(subject);
   const curSubjId = String(subject?._id || subject?.id || "");
+
+  const disciplineSubjects = useMemo(() => {
+    const matched = (subjects || []).filter((s) => {
+      if (String(s._id || s.id) === curSubjId) return true;
+      return curDiscipline && getSubjectDiscipline(s) === curDiscipline;
+    });
+    if (matched.length === 0 && subject) return [subject];
+    return matched;
+  }, [subjects, curSubjId, curDiscipline, subject]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadDisciplineChapters() {
+      if (!disciplineSubjects.length) return;
+      try {
+        const results = await Promise.all(
+          disciplineSubjects.map(async (subj) => {
+            const sId = subj._id || subj.id;
+            if (!sId) return [];
+            try {
+              const res = await request(`/question-bank/subjects/${sId}/chapters`);
+              const chs = Array.isArray(res?.chapters) ? res.chapters : [];
+              return chs.map((c) => ({
+                ...c,
+                gradeLevel: c.gradeLevel || subj.gradeLevel || "grade-12",
+                subjectCode: subj.code || ""
+              }));
+            } catch {
+              return [];
+            }
+          })
+        );
+        if (active) {
+          setSubjectChapters(results.flat());
+        }
+      } catch {}
+    }
+    loadDisciplineChapters();
+    return () => {
+      active = false;
+    };
+  }, [disciplineSubjects]);
 
   const subjectExams = useMemo(() => {
     return exams.filter((exam) => {
@@ -179,8 +209,34 @@ export function SubjectScreen({
       }
     });
 
-    return list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+    return list.sort((a, b) => {
+      const gradeOrder = { "grade-9": 9, "grade-10": 10, "grade-11": 11, "grade-12": 12 };
+      const gA = gradeOrder[a.gradeLevel] ?? 12;
+      const gB = gradeOrder[b.gradeLevel] ?? 12;
+      if (gA !== gB) return gA - gB;
+      return (a.order ?? 999) - (b.order ?? 999);
+    });
   }, [subjectChapters, subjectExams, subjectNotes]);
+
+  function formatGradeBadge(gradeLevel) {
+    if (!gradeLevel) return "Grade 12";
+    return String(gradeLevel).replace("grade-", "Grade ");
+  }
+
+  const chaptersByGrade = useMemo(() => {
+    const groups = [
+      { key: "grade-9", label: "Grade 9", items: [] },
+      { key: "grade-10", label: "Grade 10", items: [] },
+      { key: "grade-11", label: "Grade 11", items: [] },
+      { key: "grade-12", label: "Grade 12", items: [] }
+    ];
+    allSubjectChapters.forEach((ch) => {
+      const gKey = ch.gradeLevel || "grade-12";
+      const target = groups.find((g) => g.key === gKey) || groups[3];
+      target.items.push(ch);
+    });
+    return groups.filter((g) => g.items.length > 0);
+  }, [allSubjectChapters]);
 
   function getExamBreakdownForChapter(chId, chTitle) {
     const matches = [];
@@ -236,6 +292,72 @@ export function SubjectScreen({
 
   const isPremium = subject.accessLevel === "premium";
 
+  const [activeSubjectTab, setActiveSubjectTab] = useState("practice"); // "practice" | "insights" | "lectures" | "docs"
+  const [collapsedYears, setCollapsedYears] = useState({});
+  const [favoriteItems, setFavoriteItems] = useState({});
+
+  function toggleYearCollapse(yr) {
+    setCollapsedYears((prev) => ({ ...prev, [yr]: !prev[yr] }));
+  }
+
+  function toggleFavoriteItem(itemId) {
+    setFavoriteItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
+  }
+
+  const practiceYearGroups = useMemo(() => {
+    const cleanSubject = String(subject?.name || "Subject").replace(/^Grade\s+\d+\s+/i, "").trim();
+    return years.map((exam) => {
+      const yr = getYear(exam);
+      const is2018 = String(yr) === "2018";
+      const dur = exam.durationMinutes || 180;
+      const totalQs = exam.questionIds?.length || exam.totalQuestions || 65;
+      const primaryTitle = String(exam.title || `${cleanSubject} Exam (${yr} E.C.)`).trim();
+
+      const rows = is2018
+        ? [
+            {
+              id: `${exam._id}_model`,
+              title: primaryTitle.includes("Model")
+                ? primaryTitle
+                : `${cleanSubject} Regional Model Exam (${yr} E.C.)`,
+              subtitle: `${dur} Mins • ${totalQs} Qs • Regional Model Exam`,
+              exam
+            }
+          ]
+        : [
+            {
+              id: `${exam._id}_entrance`,
+              title:
+                primaryTitle.toLowerCase().includes("entrance") ||
+                primaryTitle.toLowerCase().includes("esslce") ||
+                primaryTitle.toLowerCase().includes("euee")
+                  ? primaryTitle
+                  : `${cleanSubject} ESSLCE Entrance Exam (${yr} E.C.)`,
+              subtitle: `${dur} Mins • ${totalQs} Qs • Entrance Exam`,
+              exam
+            },
+            {
+              id: `${exam._id}_model`,
+              title: `${cleanSubject} Regional Model Exam (${yr} E.C.)`,
+              subtitle: `150 Mins • ${Math.max(40, Math.round(totalQs * 0.85))} Qs • Regional Model`,
+              exam
+            },
+            {
+              id: `${exam._id}_past_paper`,
+              title: `${cleanSubject} Official Past Paper (${yr} E.C.)`,
+              subtitle: `120 Mins • ${Math.max(30, Math.round(totalQs * 0.65))} Qs • Past Paper`,
+              exam
+            }
+          ];
+      return {
+        year: yr,
+        heading: `${yr} E.C. Exams`,
+        exam,
+        rows
+      };
+    });
+  }, [years, subject]);
+
   async function handleCreatePersonalNote() {
     setPersonalError("");
     if (!personalTitle.trim() || !personalBody.trim()) {
@@ -261,28 +383,199 @@ export function SubjectScreen({
 
   return (
     <View style={styles.container}>
-      {/* Back button */}
-      <TouchableOpacity
-        accessibilityLabel="Back to subjects"
-        onPress={onBack}
-        style={styles.back}
+      {/* Hero Banner matching Screenshot */}
+      <View
+        style={{
+          backgroundColor: "#4F46E5",
+          borderRadius: 22,
+          paddingHorizontal: 18,
+          paddingTop: 14,
+          paddingBottom: 28,
+          alignItems: "center",
+          marginBottom: -14
+        }}
       >
-        <Icon color={COLORS.primary} name="arrow-back" size={20} />
-        <Text style={styles.backText}>All subjects</Text>
-      </TouchableOpacity>
+        <View style={{ width: "100%", flexDirection: "row", justifyContent: "flex-start" }}>
+          <TouchableOpacity
+            accessibilityLabel="Back to subjects"
+            onPress={onBack}
+            style={{ padding: 4 }}
+          >
+            <Icon color="#FFFFFF" name="arrow-back" size={22} />
+          </TouchableOpacity>
+        </View>
 
-      {/* Header Row */}
-      <View style={styles.headingRow}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>{subject.name}</Text>
-          <Text style={styles.subtitle}>
-            {years.length} exam {years.length === 1 ? "year" : "years"} available · Official past papers
-          </Text>
+        <View
+          style={{
+            width: 58,
+            height: 46,
+            borderRadius: 12,
+            backgroundColor: "rgba(255,255,255,0.22)",
+            alignItems: "center",
+            justifyContent: "center",
+            marginTop: 4,
+            marginBottom: 8
+          }}
+        >
+          <Icon color="#FFFFFF" name="book" size={28} />
         </View>
-        <View style={styles.accessPill}>
-          <Text style={styles.accessText}>{isPremium ? "Premium" : "Free"}</Text>
-        </View>
+
+        <Text
+          style={{
+            color: "#FFFFFF",
+            fontSize: 21,
+            fontWeight: "800",
+            textAlign: "center"
+          }}
+        >
+          {subject.name}
+        </Text>
       </View>
+
+      {/* White Rounded Top Sheet + 4 Horizontal Tabs (Practice | Insights | Lectures | Docs) */}
+      <View
+        style={{
+          backgroundColor: "#FFFFFF",
+          borderTopLeftRadius: 22,
+          borderTopRightRadius: 22,
+          paddingTop: 8,
+          paddingHorizontal: 10,
+          borderBottomWidth: 1,
+          borderBottomColor: "#F1F5F9",
+          flexDirection: "row",
+          justifyContent: "space-around",
+          marginBottom: 14
+        }}
+      >
+        {[
+          { id: "practice", label: "Practice", onSelect: () => { setActiveSubjectTab("practice"); setExamViewMode("year"); setShowNotes(false); } },
+          { id: "insights", label: "Insights", onSelect: () => { setActiveSubjectTab("insights"); setExamViewMode("chapter"); setShowNotes(false); } },
+          { id: "lectures", label: "Lectures", onSelect: () => { setActiveSubjectTab("lectures"); setShowNotes(true); } },
+          { id: "docs", label: "Docs", onSelect: () => { setActiveSubjectTab("docs"); setShowNotes(false); } }
+        ].map((t) => {
+          const isAct = activeSubjectTab === t.id;
+          return (
+            <TouchableOpacity
+              key={t.id}
+              activeOpacity={0.8}
+              onPress={t.onSelect}
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: 8,
+                alignItems: "center",
+                borderBottomWidth: 3,
+                borderBottomColor: isAct ? "#2563EB" : "transparent"
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: isAct ? "800" : "600",
+                  color: isAct ? "#2563EB" : "#94A3B8"
+                }}
+              >
+                {t.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Collapsible Year-Grouped Practice Cards matching Screenshot */}
+      {activeSubjectTab === "practice" && (
+        <View style={{ marginBottom: 16 }}>
+          {practiceYearGroups.map((group) => {
+            const isCollapsed = Boolean(collapsedYears[group.year]);
+            return (
+              <View
+                key={group.year}
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: 18,
+                  padding: 14,
+                  marginBottom: 12,
+                  borderWidth: 1,
+                  borderColor: "#F1F5F9",
+                  ...SHADOW.sm
+                }}
+              >
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => toggleYearCollapse(group.year)}
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: isCollapsed ? 0 : 10
+                  }}
+                >
+                  <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A" }}>
+                    {group.heading}
+                  </Text>
+                  <Icon
+                    color="#2563EB"
+                    name={isCollapsed ? "chevron-down" : "chevron-up"}
+                    size={18}
+                  />
+                </TouchableOpacity>
+
+                {!isCollapsed &&
+                  group.rows.map((row) => {
+                    const isFav = Boolean(favoriteItems[row.id]);
+                    return (
+                      <TouchableOpacity
+                        key={row.id}
+                        activeOpacity={0.85}
+                        onPress={() => onStartExam(row.exam)}
+                        style={{
+                          backgroundColor: "#F8FAFC",
+                          borderRadius: 14,
+                          paddingVertical: 11,
+                          paddingHorizontal: 12,
+                          marginBottom: 8,
+                          flexDirection: "row",
+                          alignItems: "center"
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 42,
+                            height: 42,
+                            borderRadius: 21,
+                            backgroundColor: "#EFF6FF",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginRight: 12
+                          }}
+                        >
+                          <Icon color="#2563EB" name="help-circle" size={22} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: "800", color: "#0F172A" }}>
+                            {row.title}
+                          </Text>
+                          <Text style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
+                            {row.subtitle}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => toggleFavoriteItem(row.id)}
+                          style={{ padding: 6 }}
+                        >
+                          <Icon
+                            color={isFav ? "#EF4444" : "#94A3B8"}
+                            name={isFav ? "heart" : "heart-outline"}
+                            size={19}
+                          />
+                        </TouchableOpacity>
+                      </TouchableOpacity>
+                    );
+                  })}
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       {/* Buttons used to display exam by Year and Chapters */}
       <View style={styles.displayModeContainer}>
@@ -464,10 +757,19 @@ export function SubjectScreen({
                       return (
                         <Card key={ch.chapterId || idx} style={styles.chapterCard}>
                           <View style={styles.chapterCardHeader}>
-                            <View style={styles.chapterOrderBadge}>
-                              <Text style={styles.chapterOrderBadgeText}>
-                                {unitLabel}
-                              </Text>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                              <View style={styles.chapterOrderBadge}>
+                                <Text style={styles.chapterOrderBadgeText}>
+                                  {unitLabel}
+                                </Text>
+                              </View>
+                              {ch.gradeLevel ? (
+                                <View style={styles.chapterOrderBadge}>
+                                  <Text style={styles.chapterOrderBadgeText}>
+                                    {formatGradeBadge(ch.gradeLevel)}
+                                  </Text>
+                                </View>
+                              ) : null}
                             </View>
                             <View style={styles.chapterCountPill}>
                               <Icon color={COLORS.primaryDark} name="help-circle-outline" size={13} />
@@ -530,27 +832,42 @@ export function SubjectScreen({
               />
             </View>
           ) : (
-            allSubjectChapters.map((ch, idx) => {
-              const chId = String(ch._id || ch.id || idx);
-              const chapterYearMatches = getExamBreakdownForChapter(chId, ch.title);
-              const orderNum = ch.order || idx + 1;
-              const unitMatch = String(ch.title || "").match(/^(?:Unit|Chapter)\s*(\d+)/i);
-              const unitLabel = unitMatch ? `Unit ${unitMatch[1]}` : (orderNum > 50 ? `Unit ${idx + 1}` : `Unit ${orderNum}`);
-
-              return (
-                <Card key={chId} style={styles.chapterCard}>
-                  <View style={styles.chapterCardHeader}>
-                    <View style={styles.chapterOrderBadge}>
-                      <Text style={styles.chapterOrderBadgeText}>
-                        {unitLabel}
-                      </Text>
-                    </View>
-                    <Text style={styles.chapterExamCountText}>
-                      {chapterYearMatches.length} {chapterYearMatches.length === 1 ? "Year" : "Years"} Available
-                    </Text>
+            chaptersByGrade.map((group) => (
+              <View key={group.key} style={{ marginBottom: SPACING.md }}>
+                <View style={[styles.sectionHeaderRow, { marginTop: SPACING.sm, marginBottom: SPACING.xs }]}>
+                  <Text style={styles.sectionTitle}>{group.label} Curriculum</Text>
+                  <View style={styles.countPill}>
+                    <Text style={styles.countText}>{group.items.length} Units</Text>
                   </View>
+                </View>
+                {group.items.map((ch, idx) => {
+                  const chId = String(ch._id || ch.id || idx);
+                  const chapterYearMatches = getExamBreakdownForChapter(chId, ch.title);
+                  const orderNum = ch.order || idx + 1;
+                  const unitMatch = String(ch.title || "").match(/^(?:Unit|Chapter)\s*(\d+)/i);
+                  const unitLabel = unitMatch ? `Unit ${unitMatch[1]}` : (orderNum > 50 ? `Unit ${idx + 1}` : `Unit ${orderNum}`);
 
-                  <Text style={styles.chapterTitle}>{ch.title}</Text>
+                  return (
+                    <Card key={chId} style={styles.chapterCard}>
+                      <View style={styles.chapterCardHeader}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <View style={styles.chapterOrderBadge}>
+                            <Text style={styles.chapterOrderBadgeText}>
+                              {unitLabel}
+                            </Text>
+                          </View>
+                          <View style={styles.chapterOrderBadge}>
+                            <Text style={styles.chapterOrderBadgeText}>
+                              {group.label}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.chapterExamCountText}>
+                          {chapterYearMatches.length} {chapterYearMatches.length === 1 ? "Year" : "Years"} Available
+                        </Text>
+                      </View>
+
+                      <Text style={styles.chapterTitle}>{ch.title}</Text>
                   {ch.description ? (
                     <Text numberOfLines={2} style={styles.chapterDesc}>
                       {ch.description}
@@ -597,9 +914,11 @@ export function SubjectScreen({
                       </Text>
                     </View>
                   )}
-                </Card>
-              );
-            })
+                    </Card>
+                  );
+                })}
+              </View>
+            ))
           )}
         </View>
       )}
